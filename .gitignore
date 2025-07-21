@@ -1,0 +1,12 @@
+# VS code
+.vscode
+
+# Compiled app
+assembler
+
+# Test files and related outputs
+*.as
+*.am
+*.ob
+*.ent
+*.ext
