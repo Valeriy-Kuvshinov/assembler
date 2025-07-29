@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "globals.h"
+#include "files.h"
 #include "errors.h"
 #include "utils.h"
 #include "pre_assembler.h"
 
+/* Inner STATIC methods */
+/* ==================================================================== */
 /* Handle preprocessing phase for a single file */
 static int handle_preprocessing(const char* input_file_with_ext, const char* output_file) {
     if (!preprocess_macros(input_file_with_ext, output_file)) {
@@ -20,8 +22,8 @@ static int handle_preprocessing(const char* input_file_with_ext, const char* out
 
 /* Process a single input file */
 static int process_file(const char* input_file, int file_number, int total_files) {
-    char input_file_with_ext[WORD_COUNT];
-    char output_file[WORD_COUNT];
+    char input_file_with_ext[MAX_FILENAME_LENGTH];
+    char output_file[MAX_FILENAME_LENGTH];
     char *dot_pos;
     FILE *test_file;
     
@@ -67,6 +69,8 @@ static int process_file(const char* input_file, int file_number, int total_files
     return TRUE;
 }
 
+/* App main method */
+/* ==================================================================== */
 int main(int argc, char *argv[]) {
     int i, runtime_result;
     int success_count = 0;

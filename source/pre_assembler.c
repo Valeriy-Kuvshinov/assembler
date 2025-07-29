@@ -3,7 +3,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "globals.h"
 #include "errors.h"
 #include "utils.h"
 #include "instructions.h"
@@ -11,7 +10,6 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-
 /* Check if macro name is valid */
 static int is_valid_macro_name(const char *name) {
 	size_t len, j;
@@ -310,7 +308,6 @@ static void init_macro_table(MacroTable *table) {
 
 /* Outer regular methods */
 /* ==================================================================== */
-
 int preprocess_macros(const char *src_filename, const char *am_filename) {
 	FILE *src, *am;
 	MacroTable macro_table;

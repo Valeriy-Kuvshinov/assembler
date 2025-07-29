@@ -11,9 +11,14 @@
 #define ERR_INVALID_MACRO_NAME "Invalid macro name"
 #define ERR_DUPLICATE_MACRO "Duplicate macro name"
 #define ERR_UNEXPECTED_TOKEN "Unexpected token"
-
-/* Function prototypes */
-
-void print_error(const char *message, const char *context);
+#define ERR_UNDEFINED_INSTRUCTION "Undefined instruction"
+#define ERR_INVALID_OPERAND_COUNT "Incorrect number of operands"
+#define ERR_ILLEGAL_ADDRESSING_MODE "Illegal addressing mode"
+#define ERR_LABEL_SYNTAX "Invalid label syntax"
+#define ERR_LABEL_TOO_LONG "Label name too long"
+#define ERR_DUPLICATE_LABEL "Label already defined"
+#define ERR_UNKNOWN_LABEL "Label not found"
+#define ERR_MISSING_LABEL_COLON "Missing ':' after label"
+#define ERR_ENTRY_LABEL_NOT_FOUND "Entry label not defined"
 
 #endif

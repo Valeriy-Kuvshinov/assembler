@@ -2,14 +2,12 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "globals.h"
 #include "errors.h"
 #include "utils.h"
 #include "tokenizer.h"
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-
 static int finalize_token(char *current_token, int char_index, char ***tokens, 
                          int *token_index, int *token_count, int tokens_capacity) {
     char **temp_tokens = *tokens;
@@ -117,7 +115,6 @@ static int init_parsing(ParseState *state, int *token_count) {
 
 /* Outer regular methods */
 /* ==================================================================== */
-
 int parse_tokens(const char *line, char ***tokens_ptr, int *token_count) {
     const char *p = line;
     ParseState state = {0};

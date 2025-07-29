@@ -4,6 +4,14 @@
 #include <ctype.h>
 
 #include "utils.h"
+#include "errors.h"
+
+void print_error(const char *message, const char *context) {
+    if (context)
+        fprintf(stderr, "Error: %s (%s) \n", message, context);
+    else
+        fprintf(stderr, "Error: %s \n", message);
+}
 
 void safe_free(void **ptr) {
     if (ptr && *ptr) {
@@ -24,10 +32,12 @@ void trim_whitespace(char* str) {
     int i;
     
     /* Find first non-whitespace */
-    while (isspace((unsigned char)str[start])) start++;
+    while (isspace((unsigned char)str[start])) 
+        start++;
     
     /* Find last non-whitespace */
-    while (end >= start && isspace((unsigned char)str[end])) end--;
+    while (end >= start && isspace((unsigned char)str[end])) 
+        end--;
     
     /* Shift characters */
     for (i = 0; i <= end - start; i++) {

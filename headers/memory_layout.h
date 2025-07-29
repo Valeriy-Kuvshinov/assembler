@@ -1,5 +1,5 @@
-#ifndef GLOBALS_H
-#define GLOBALS_H
+#ifndef MEMORY_LAYOUT_H
+#define MEMORY_LAYOUT_H
 
 /* Memory Configuration */
 #define WORD_COUNT 256 /* Total number of memory words - cells */
@@ -29,17 +29,5 @@
 #define BASE4_B_DIGIT "b"
 #define BASE4_C_DIGIT "c"
 #define BASE4_D_DIGIT "d"
-
-/* File Extensions */
-#define FILE_EXT_INPUT ".as"
-#define FILE_EXT_PREPROC ".am"
-#define FILE_EXT_OBJECT ".ob"
-#define FILE_EXT_ENTRY ".ent"
-#define FILE_EXT_EXTERN ".ext"
-#define FILE_EXT_TEMP ".tmp"
-
-/* Boolean Constants */
-#define FALSE 0
-#define TRUE !FALSE
 
 #endif
