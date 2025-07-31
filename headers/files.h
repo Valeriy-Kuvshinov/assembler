@@ -6,7 +6,6 @@
 #define FILE_EXT_OBJECT ".ob"
 #define FILE_EXT_ENTRY ".ent"
 #define FILE_EXT_EXTERN ".ext"
-#define FILE_EXT_TEMP ".tmp"
 
 #define MAX_FILENAME_LENGTH 100
 

@@ -29,7 +29,7 @@
 #define ADDR_FLAG_MATRIX    (1 << 2)
 #define ADDR_FLAG_REGISTER  (1 << 3)
 
-typedef struct { 
+typedef struct {
     /* the index is the opcode */
     const char *name;
     int num_operands;
@@ -37,6 +37,9 @@ typedef struct {
     int legal_dest_addr_modes;  /* bitmask */
 } Instruction;
 
+/* Function prototypes */
+
+int get_instruction_opcode(const char *name);
 const Instruction* get_instruction(const char *name);
 
 #endif

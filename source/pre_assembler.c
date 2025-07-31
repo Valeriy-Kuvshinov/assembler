@@ -327,7 +327,7 @@ int preprocess_macros(const char *src_filename, const char *am_filename) {
 		return FALSE;
 	}
 
-	rewind(src); /* Rewind for second pass */
+	rewind(src);
 
 	am = fopen(am_filename, "w"); /* Open output file */
 

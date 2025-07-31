@@ -4,6 +4,9 @@
 # Compiled app
 assembler
 
+# Compiled C Object files
+*.o
+
 # Test files and related outputs
 *.as
 *.am

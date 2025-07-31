@@ -28,8 +28,7 @@ void safe_fclose(FILE **fp) {
 }
 
 void trim_whitespace(char* str) {
-    int start = 0, end = strlen(str) - 1;
-    int i;
+    int i, start = 0, end = strlen(str) - 1;
     
     /* Find first non-whitespace */
     while (isspace((unsigned char)str[start])) 

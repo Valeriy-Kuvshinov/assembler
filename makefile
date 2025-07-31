@@ -1,7 +1,7 @@
 # Compile flags and directory names
 # that contain source and headers
 CC = gcc
-CFLAGS = -ansi -pedantic -Wall -g
+FLAGS = -ansi -std=c90 -pedantic -Wall -g
 SRC_DIR = source
 INC_DIR = headers
 
@@ -17,11 +17,11 @@ all: $(EXEC)
 
 $(EXEC): $(OBJECTS)
 	@echo "Linking $(EXEC)..."
-	@$(CC) $(CFLAGS) -I$(INC_DIR) -o $@ $(OBJECTS)
+	@$(CC) $(FLAGS) -I$(INC_DIR) -o $@ $(OBJECTS)
 
 %.o: $(SRC_DIR)/%.c $(HEADERS)
 	@echo "Compiling $<..."
-	@$(CC) $(CFLAGS) -I$(INC_DIR) -c $< -o $@
+	@$(CC) $(FLAGS) -I$(INC_DIR) -c $< -o $@
 
 clean:
 	@rm -f $(EXEC) $(OBJECTS)

@@ -67,6 +67,16 @@ static int handle_whitespace(ParseState *state) {
 }
 
 static int handle_comma(ParseState *state) {
+    /* First finalize current token if we're in one */
+    if (state->in_token) {
+        if (!finalize_token(state->current_token, state->char_index, &state->tokens,
+                          &state->token_index, state->token_count, state->tokens_capacity))
+            return FALSE;
+        
+        state->in_token = 0;
+        state->char_index = 0;
+    }
+
     if (!validate_comma(state->token_index, state->prev_was_comma))
         return FALSE;
 
@@ -110,6 +120,7 @@ static int init_parsing(ParseState *state, int *token_count) {
 
     *token_count = 0;
     state->token_count = token_count;
+
     return TRUE;
 }
 
@@ -151,6 +162,7 @@ int parse_tokens(const char *line, char ***tokens_ptr, int *token_count) {
 
     safe_free((void**)&state.current_token);
     *tokens_ptr = state.tokens;
+
     return TRUE;
 }
 

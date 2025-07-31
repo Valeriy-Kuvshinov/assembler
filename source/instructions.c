@@ -30,3 +30,13 @@ const Instruction* get_instruction(const char *name) {
     }
     return NULL;
 }
+
+int get_instruction_opcode(const char *name) {
+    int i;
+
+    for (i = 0; i < MAX_INSTRUCTIONS; i++) {
+        if (strcmp(name, instruction_set[i].name) == 0)
+            return i;
+    }
+    return -1; /* Not found */
+}

@@ -21,13 +21,46 @@
 
 /* A/R/E Field Values */
 #define ARE_ABSOLUTE 0
-#define ARE_EXTERNAL 1
 #define ARE_RELOCATABLE 2
+#define ARE_EXTERNAL 1
 
 #define BASE4_DIGITS 4
 #define BASE4_A_DIGIT "a"
 #define BASE4_B_DIGIT "b"
 #define BASE4_C_DIGIT "c"
 #define BASE4_D_DIGIT "d"
+
+/* Symbol table entry */
+typedef struct {
+    char name[MAX_LABEL_LENGTH];
+    int value;          /* Address value */
+    int type;           /* CODE_SYMBOL, DATA_SYMBOL, etc. */
+    int is_entry;       /* Boolean flag */
+    int is_extern;      /* Boolean flag */
+} Symbol;
+
+/* Symbol table */
+typedef struct {
+    Symbol symbols[MAX_LABELS];
+    int count;
+} SymbolTable;
+
+/* Memory word representation */
+typedef struct {
+    unsigned int value : 10;    /* 10-bit value */
+    unsigned int are : 2;       /* A/R/E bits */
+} MemoryWord;
+
+/* Memory image */
+typedef struct {
+    MemoryWord words[WORD_COUNT];
+    int ic;                     /* Instruction counter */
+    int dc;                     /* Data counter */
+} MemoryImage;
+
+/* Function prototypes */
+
+int has_entries(const SymbolTable *symtab);
+int has_externs(const SymbolTable *symtab);
 
 #endif

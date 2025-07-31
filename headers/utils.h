@@ -3,9 +3,18 @@
 
 #include <stdio.h>
 
+#define MAX_LINE_LENGTH 81  /* 80 chars + null terminator */
+
 /* Boolean Constants */
 #define FALSE 0
 #define TRUE !FALSE
+
+/* Input Parsing Constants */
+#define COMMENT_CHAR ';'
+#define DIRECTIVE_CHAR '.'
+#define UNDERSCORE_CHAR '_'
+#define LABEL_TERMINATOR ':'
+#define IMMEDIATE_PREFIX '#'
 
 /* Function prototypes */
 
