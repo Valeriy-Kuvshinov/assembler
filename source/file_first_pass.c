@@ -9,6 +9,8 @@
 #include "errors.h"
 #include "utils.h"
 
+/* Inner STATIC methods */
+/* ==================================================================== */
 static int is_valid_label(const char *label) {
     int i;
     
@@ -20,12 +22,11 @@ static int is_valid_label(const char *label) {
     if (!isalpha((unsigned char)label[0]))
         return FALSE;
         
-    /* Subsequent characters must be alphanumeric */
+    /* Subsequent characters must be alphanumeric or underscore*/
     for (i = 1; label[i]; i++) {
-        if (!isalnum((unsigned char)label[i]))
+        if (!isalnum((unsigned char)label[i]) && label[i] != '_')
             return FALSE;
     }
-    
     return TRUE;
 }
 
@@ -74,8 +75,8 @@ static int process_label(char *label, SymbolTable *symtab, int address, int is_d
 
 static int process_data_directive(char **tokens, int token_count, int start_idx,
                                  SymbolTable *symtab, MemoryImage *memory) {
-    int i, value;
     char *endptr;
+    int i, value;
     
     if (token_count <= start_idx + 1) {
         print_error("Missing data values", NULL);
@@ -105,8 +106,8 @@ static int process_data_directive(char **tokens, int token_count, int start_idx,
 
 static int process_string_directive(char **tokens, int token_count, int start_idx,
                                    SymbolTable *symtab, MemoryImage *memory) {
-    int i;
     char *str;
+    int i;
     
     if (token_count != start_idx + 2) {
         print_error("Invalid string directive", NULL);
@@ -140,8 +141,8 @@ static int process_string_directive(char **tokens, int token_count, int start_id
 
 static int process_mat_directive(char **tokens, int token_count, int start_idx,
                                 SymbolTable *symtab, MemoryImage *memory) {
-    int rows, cols, i;
     char *matrix_def;
+    int rows, cols, i;
     
     /* Must have at least .mat [rows][cols] and one value */
     if (token_count <= start_idx + 2) {
@@ -221,7 +222,8 @@ static int process_directive(char **tokens, int token_count, int start_idx,
 }
 
 static int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
-    int i, length = 1; /* Base instruction word */
+    int i;
+    int length = 1; /* Base instruction word */
     
     for (i = 0; i < operand_count; i++) {
         /* Check addressing mode and add words accordingly */
@@ -246,10 +248,12 @@ static int calculate_instruction_length(const Instruction *inst, char **operands
 
 static int process_instruction(char **tokens, int token_count, 
                               SymbolTable *symtab, MemoryImage *memory) {
-    int operand_start, operand_count, inst_length, inst_idx = 0;
+    int operand_start, operand_count, inst_length;
+    int inst_idx = 0;
     const Instruction *inst;
     
-    if (token_count < 1) return FALSE;
+    if (token_count < 1) 
+        return FALSE;
     
     /* Check for label */
     if (strchr(tokens[0], ':')) {
@@ -263,18 +267,17 @@ static int process_instruction(char **tokens, int token_count,
         return FALSE;
     }
     
-    /* Find instruction */
     inst = get_instruction(tokens[inst_idx]);
+    /* Find instruction */
     if (!inst) {
         print_error(ERR_UNDEFINED_INSTRUCTION, tokens[inst_idx]);
         return FALSE;
     }
-    
+
     /* Calculate operand count */
     operand_start = inst_idx + 1;
     operand_count = token_count - operand_start;
-    
-    /* Debug print */
+
     printf("Instruction: %s, Expected operands: %d, Got: %d\n", tokens[inst_idx], inst->num_operands, operand_count);
 
     /* Validate operand count */
@@ -285,19 +288,18 @@ static int process_instruction(char **tokens, int token_count,
         return FALSE;
     }
     
-    /* Calculate instruction length */
     inst_length = calculate_instruction_length(inst, tokens + operand_start, operand_count);
-    
-    /* Update instruction counter */
-    memory->ic += inst_length;
+    memory->ic += inst_length; /* Update instruction counter */
     
     return TRUE;
 }
 
-/* First pass implementation */
+/* Outer regular methods */
+/* ==================================================================== */
 int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
-    int i, line_num = 0, error_flag = 0;
     char line[MAX_LINE_LENGTH];
+    int i;
+    int line_num = 0, error_flag = 0;
     FILE *fp = fopen(filename, "r");
     
     if (!fp) {
@@ -305,16 +307,14 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
         return PASS_ERROR;
     }
 
-    /* Initialize */
-    memory->ic = 0;  /* Relative to IC_START */
+    /* Initialize - IC starts at 0 (relative to IC_START=100) */
+    memory->ic = 0;  
     memory->dc = 0;
     symtab->count = 0;
 
     while (fgets(line, sizeof(line), fp)) {
         char **tokens = NULL;
-        int token_count = 0;
-        int has_label = 0;
-        int directive_idx = 0;
+        int token_count = 0, has_label = 0, directive_idx = 0;
         
         line_num++;
         trim_whitespace(line);
@@ -342,7 +342,7 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
 
         /* Process line */
         if (directive_idx < token_count && tokens[directive_idx][0] == DIRECTIVE_CHAR) {
-            /* Handle label for data directive */
+            /* Handle label for data directive - assign current DC value */
             if (has_label) {
                 if (!process_label(tokens[0], symtab, memory->dc, TRUE)) {
                     fprintf(stderr, "Line %d: Label error\n", line_num);
@@ -354,8 +354,8 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
                 fprintf(stderr, "Line %d: Directive error\n", line_num);
                 error_flag = 1;
             }
-        }
-        else {
+        } else {
+            /* Handle instruction - label gets current IC value */
             if (!process_instruction(tokens, token_count, symtab, memory)) {
                 fprintf(stderr, "Line %d: Instruction error\n", line_num);
                 error_flag = 1;
@@ -365,7 +365,8 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
     }
     fclose(fp);
     
-    /* Update data symbol addresses */
+    /* CRITICAL: Update data symbol addresses to come after code section */
+    /* Data symbols get: IC_START + final_IC + their_DC_offset */
     for (i = 0; i < symtab->count; i++) {
         if (symtab->symbols[i].type == DATA_SYMBOL) {
             symtab->symbols[i].value += IC_START + memory->ic;

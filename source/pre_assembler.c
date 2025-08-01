@@ -88,8 +88,7 @@ static const Macro *find_macro(const MacroTable *table, const char *name) {
 /* Check if line is macro call */
 static int is_macro_call(const char *line, const MacroTable *table) {
 	char temp[MAX_LINE_LENGTH];
-	char *token;
-	char *colon_pos;
+	char *token, *colon_pos;
 
 	strcpy(temp, line);
 	trim_whitespace(temp);
@@ -114,9 +113,9 @@ static int is_macro_call(const char *line, const MacroTable *table) {
 
 /* Process macro definition line */
 static int process_macro_definition(char *line, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_number) {
+    char context[100];
     char *name = strtok(line + strlen(MACRO_START), " \t");
     char *extra = strtok(NULL, " \t\n");
-    char context[100];
 
     if (!name) {
         sprintf(context, "line %d", line_number);
@@ -184,11 +183,8 @@ static void process_macro_body(const char *original_line, Macro *current_macro, 
 
 /* Collect macro definitions (first pass) */
 static int collect_macro_definitions(FILE *src, MacroTable *macro_table) {
-	char line[MAX_LINE_LENGTH];
-	char original_line[MAX_LINE_LENGTH];
-	int in_macro_definition = 0;
-	int line_number = 0;
-	int error = FALSE;
+	char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH];
+	int in_macro_definition = 0, line_number = 0, error = 0;
 	Macro *current_macro = NULL;
 
 	while (fgets(line, MAX_LINE_LENGTH, src)) {
@@ -225,14 +221,13 @@ static int collect_macro_definitions(FILE *src, MacroTable *macro_table) {
 			}
 		}
 	}
-    return (error == FALSE) ? TRUE : FALSE;
+    return (error == 0) ? TRUE : FALSE;
 }
 
 /* Expand macro call */
 static void expand_macro_call(FILE *am, const char *processed_line, const MacroTable *macro_table) {
     char temp_line[MAX_LINE_LENGTH];
-    char *colon_pos;
-    char *macro_name;
+    char *colon_pos, *macro_name;
     int i;
 
     strcpy(temp_line, processed_line);
@@ -262,8 +257,7 @@ static void expand_macro_call(FILE *am, const char *processed_line, const MacroT
 
 /* Expand macros (second pass) */
 static int expand_macros(FILE *src, FILE *am, const MacroTable *macro_table) {
-	char line[MAX_LINE_LENGTH];
-	char processed_line[MAX_LINE_LENGTH];
+	char line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
 	int in_macro_definition = 0;
 
 	while (fgets(line, MAX_LINE_LENGTH, src)) {
@@ -298,6 +292,7 @@ static int expand_macros(FILE *src, FILE *am, const MacroTable *macro_table) {
 /* Initialize macro table */
 static void init_macro_table(MacroTable *table) {
 	int i;
+
 	table->count = 0;
 
 	for (i = 0; i < MAX_MACROS; i++) {

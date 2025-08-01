@@ -6,9 +6,7 @@
 #define WORD_MASK 0x3FF /* Mask to enforce 10-bit word size */
 #define IC_START 100 /* Instruction Base Address */
 
-/* Register Configuration */
-#define NUM_REGISTERS 8 /* r0 to r7 */
-#define MAX_REGISTER 7 /* Maximum register index */
+#define MAX_REGISTER 7 /* Maximum register index, r0 to r7 */
 
 /* Symbol Table Configuration */
 #define MAX_LABEL_LENGTH 31 /* Max label length (30 + null terminator) */
@@ -24,11 +22,15 @@
 #define ARE_RELOCATABLE 2
 #define ARE_EXTERNAL 1
 
+/* Base 4 encoding */
 #define BASE4_DIGITS 4
-#define BASE4_A_DIGIT "a"
-#define BASE4_B_DIGIT "b"
-#define BASE4_C_DIGIT "c"
-#define BASE4_D_DIGIT "d"
+#define BASE4_A_DIGIT 'a'
+#define BASE4_B_DIGIT 'b'
+#define BASE4_C_DIGIT 'c'
+#define BASE4_D_DIGIT 'd'
+
+#define ADDR_LENGTH 5 /* 4 + null terminator */
+#define WORD_LENGTH 6 /* 5 + null terminator */
 
 /* Symbol table entry */
 typedef struct {

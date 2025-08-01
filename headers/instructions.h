@@ -17,7 +17,7 @@
 #define MAX_OPERANDS   2
 #define MAX_INSTRUCTION_LENGTH 5
 
-/* Addressing Mode Numeric IDs (used when parsing operands) */
+/* Addressing Mode Numeric IDs */
 #define ADDR_MODE_IMMEDIATE 0
 #define ADDR_MODE_DIRECT    1
 #define ADDR_MODE_MATRIX    2
@@ -30,7 +30,7 @@
 #define ADDR_FLAG_REGISTER  (1 << 3)
 
 typedef struct {
-    /* the index is the opcode */
+    /* Index of each instruction is the opcode */
     const char *name;
     int num_operands;
     int legal_src_addr_modes;   /* bitmask */

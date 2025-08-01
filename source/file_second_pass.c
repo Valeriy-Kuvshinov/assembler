@@ -3,13 +3,49 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "file_passer.h"
-#include "tokenizer.h"
-#include "instructions.h"
 #include "errors.h"
 #include "utils.h"
+#include "memory_layout.h"
+#include "instructions.h"
+#include "file_passer.h"
+#include "tokenizer.h"
 
-/* Helper functions */
+/* Inner STATIC methods */
+/* ==================================================================== */
+static void convert_to_base4_address(int value, char *result) {
+    char digits[] = {BASE4_A_DIGIT, BASE4_B_DIGIT, BASE4_C_DIGIT, BASE4_D_DIGIT};
+    int i;
+    
+    /* Convert to 4-digit base 4 for addresses */
+    for (i = ADDR_LENGTH - 2; i >= 0; i--) {  /* ADDR_LENGTH-2 = 3 (indices 3,2,1,0) */
+        result[i] = digits[value % BASE4_DIGITS];
+        value /= BASE4_DIGITS;
+    }
+    result[ADDR_LENGTH - 1] = '\0';  /* ADDR_LENGTH-1 = 4 */
+}
+
+static void convert_to_base4_word(int value, char *result) {
+    char digits[] = {BASE4_A_DIGIT, BASE4_B_DIGIT, BASE4_C_DIGIT, BASE4_D_DIGIT};
+    int i;
+    
+    /* Convert to 5-digit base 4 for machine words */
+    for (i = WORD_LENGTH - 2; i >= 0; i--) {  /* WORD_LENGTH-2 = 4 (indices 4,3,2,1,0) */
+        result[i] = digits[value % BASE4_DIGITS];
+        value /= BASE4_DIGITS;
+    }
+    result[WORD_LENGTH - 1] = '\0';  /* WORD_LENGTH-1 = 5 */
+}
+
+static int has_external_references(const MemoryImage *memory) {
+    int i;
+    
+    for (i = IC_START; i < IC_START + memory->ic; i++) {
+        if (memory->words[i].are == ARE_EXTERNAL)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab) {
     int i;
     
@@ -42,8 +78,8 @@ static int process_directive_second_pass(char **tokens, int token_count,
 }
 
 static int parse_matrix_operand(const char *operand, int *base_reg, int *index_reg) {
-    char *open1, *close1, *open2, *close2, *reg1_str, *reg2_str;
     char temp[MAX_LINE_LENGTH];
+    char *open1, *close1, *open2, *close2, *reg1_str, *reg2_str;
     
     /* Copy operand to temp buffer for manipulation */
     strncpy(temp, operand, MAX_LINE_LENGTH - 1);
@@ -91,8 +127,8 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
 
 static int encode_operand(const char *operand, SymbolTable *symtab, 
                          MemoryWord *word, int is_dest) {
-    int i;
     char *endptr;
+    int i;
     long value;
     
     /* Immediate value (#num) */
@@ -125,9 +161,9 @@ static int encode_operand(const char *operand, SymbolTable *symtab,
     
     /* Matrix access (label[rX][rY]) */
     if (strchr(operand, '[')) {
-        int base_reg, index_reg;
         char label[MAX_LABEL_LENGTH];
         char *bracket = strchr(operand, '[');
+        int base_reg, index_reg;
         
         /* Extract label part */
         strncpy(label, operand, bracket - operand);
@@ -149,25 +185,25 @@ static int encode_operand(const char *operand, SymbolTable *symtab,
                 /* Store registers in next word */
                 word[1].value = (base_reg << 6) | (index_reg << 2);
                 word[1].are = ARE_ABSOLUTE;
-
                 return TRUE;
             }
         }
         print_error(ERR_UNKNOWN_LABEL, label);
+
         return FALSE;
     }
     
     /* Symbol/label */
     for (i = 0; i < symtab->count; i++) {
         if (strcmp(symtab->symbols[i].name, operand) == 0) {
-            word->value = symtab->symbols[i].value;
-
-            if (symtab->symbols[i].type == EXTERNAL_SYMBOL)
+            if (symtab->symbols[i].type == EXTERNAL_SYMBOL) {
+                word->value = 0; /* External symbols have value 0 */
                 word->are = ARE_EXTERNAL;
-            else
+            } else {
+                word->value = symtab->symbols[i].value;
                 word->are = (symtab->symbols[i].type == DATA_SYMBOL) ? 
                            ARE_RELOCATABLE : ARE_ABSOLUTE;
-            
+            }
             return TRUE;
         }
     }
@@ -176,19 +212,55 @@ static int encode_operand(const char *operand, SymbolTable *symtab,
     return FALSE;
 }
 
+static int validate_addressing_modes(const Instruction *inst, char **operands, int operand_count) {
+    int i;
+    
+    for (i = 0; i < operand_count; i++) {
+        int addr_mode, legal_modes;
+        
+        /* Determine addressing mode */
+        if (operands[i][0] == '#')
+            addr_mode = ADDR_FLAG_IMMEDIATE;
+        else if (strchr(operands[i], '['))
+            addr_mode = ADDR_FLAG_MATRIX;
+        else if (operands[i][0] == 'r' && isdigit(operands[i][1]) && operands[i][2] == '\0')
+            addr_mode = ADDR_FLAG_REGISTER;
+        else
+            addr_mode = ADDR_FLAG_DIRECT;
+        
+        /* Check if addressing mode is legal for this operand position */
+        legal_modes = (i == 0) ? inst->legal_src_addr_modes : inst->legal_dest_addr_modes;
+        
+        if (!(legal_modes & addr_mode)) {
+            print_error(ERR_ILLEGAL_ADDRESSING_MODE, operands[i]);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 static int encode_instruction(const Instruction *inst, char **operands, 
                              SymbolTable *symtab, MemoryImage *memory) {
     int opcode, i;
-    int src_mode = 0, dest_mode = 0, has_label = 0;
+    int operand_start = 0, operand_count = 0, src_mode = 0, dest_mode = 0;
     MemoryWord *current_word;
     
     /* Check for label (should have been processed in first pass) */
     for (i = 0; operands[i]; i++) {
         if (strchr(operands[i], ':')) {
-            has_label = 1;
+            operand_start = 1;  /* Skip the label when processing operands */
             break;
         }
     }
+    
+    /* Count actual operands (excluding label) */
+    for (i = operand_start; operands[i]; i++) {
+        operand_count++;
+    }
+    
+    /* Validate addressing modes */
+    if (!validate_addressing_modes(inst, operands + operand_start, operand_count)) 
+        return FALSE;
     
     /* Get current memory word */
     if (memory->ic >= WORD_COUNT) {
@@ -199,6 +271,7 @@ static int encode_instruction(const Instruction *inst, char **operands,
     
     /* Encode opcode using the helper function */
     opcode = get_instruction_opcode(inst->name);
+
     if (opcode == -1) {
         print_error("Invalid instruction", inst->name);
         return FALSE;
@@ -211,14 +284,16 @@ static int encode_instruction(const Instruction *inst, char **operands,
         MemoryWord operand_word;
         
         /* Encode source operand */
-        if (!encode_operand(operands[has_label ? 1 : 0], symtab, &operand_word, FALSE))
+        if (!encode_operand(operands[operand_start], symtab, &operand_word, FALSE))
             return FALSE;
         
-        src_mode = (operands[has_label ? 1 : 0][0] == IMMEDIATE_PREFIX) ? 
+        src_mode = (operands[operand_start][0] == IMMEDIATE_PREFIX) ? 
                   ADDR_MODE_IMMEDIATE : 
-                  (strchr(operands[has_label ? 1 : 0], '[')) ? 
+                  (strchr(operands[operand_start], '[')) ? 
                   ADDR_MODE_MATRIX : 
-                  (operands[has_label ? 1 : 0][0] == 'r') ? 
+                  (operands[operand_start][0] == 'r' && 
+                   isdigit(operands[operand_start][1]) && 
+                   operands[operand_start][2] == '\0') ? 
                   ADDR_MODE_REGISTER : 
                   ADDR_MODE_DIRECT;
         
@@ -231,26 +306,48 @@ static int encode_instruction(const Instruction *inst, char **operands,
                 return FALSE;
             }
             memory->words[memory->ic++] = operand_word;
+            
+            /* For matrix addressing, store the second word with registers */
+            if (src_mode == ADDR_MODE_MATRIX) {
+                if (memory->ic >= WORD_COUNT) {
+                    print_error("Code section overflow", NULL);
+                    return FALSE;
+                }
+                memory->words[memory->ic++] = operand_word; /* This contains the register encoding */
+            }
         }
         
         /* Encode destination operand */
         if (inst->num_operands >= 2) {
-            if (!encode_operand(operands[has_label ? 2 : 1], symtab, &operand_word, TRUE))
+            if (!encode_operand(operands[operand_start + 1], symtab, &operand_word, TRUE))
                 return FALSE;
             
-            dest_mode = (operands[has_label ? 2 : 1][0] == 'r') ? 
+            dest_mode = (operands[operand_start + 1][0] == 'r' && 
+                        isdigit(operands[operand_start + 1][1]) && 
+                        operands[operand_start + 1][2] == '\0') ? 
                        ADDR_MODE_REGISTER : 
+                       (strchr(operands[operand_start + 1], '[')) ?
+                       ADDR_MODE_MATRIX :
                        ADDR_MODE_DIRECT;
             
             current_word->value |= (dest_mode << DEST_SHIFT);
             
             /* Store additional operand words if needed */
-            if (dest_mode == ADDR_MODE_DIRECT) {
+            if (dest_mode == ADDR_MODE_DIRECT || dest_mode == ADDR_MODE_MATRIX) {
                 if (memory->ic >= WORD_COUNT) {
                     print_error("Code section overflow", NULL);
                     return FALSE;
                 }
                 memory->words[memory->ic++] = operand_word;
+                
+                /* For matrix addressing, store the second word with registers */
+                if (dest_mode == ADDR_MODE_MATRIX) {
+                    if (memory->ic >= WORD_COUNT) {
+                        print_error("Code section overflow", NULL);
+                        return FALSE;
+                    }
+                    memory->words[memory->ic++] = operand_word; /* This contains the register encoding */
+                }
             }
         }
     }
@@ -258,6 +355,7 @@ static int encode_instruction(const Instruction *inst, char **operands,
 }
 
 static void write_object_file(const char *filename, MemoryImage *memory) {
+    char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
     int i;
     FILE *fp = fopen(filename, "w");
     
@@ -266,23 +364,29 @@ static void write_object_file(const char *filename, MemoryImage *memory) {
         return;
     }
     
-    /* Write header with code and data sizes */
-    fprintf(fp, "%d %d\n", memory->ic, memory->dc);
+    /* Write header with code and data sizes in base 4 */
+    convert_to_base4_word(memory->ic, addr_str);
+    convert_to_base4_word(memory->dc, value_str);
+    fprintf(fp, "%s %s\n", addr_str, value_str);
     
-    /* Write instructions */
+    /* Write instructions in base 4 */
     for (i = IC_START; i < IC_START + memory->ic; i++) {
-        fprintf(fp, "%04d %04X\n", i, memory->words[i].value);
+        convert_to_base4_address(i, addr_str);
+        convert_to_base4_word(memory->words[i].value, value_str);
+        fprintf(fp, "%s %s\n", addr_str, value_str);
     }
     
-    /* Write data */
+    /* Write data in base 4 */
     for (i = IC_START + memory->ic; i < IC_START + memory->ic + memory->dc; i++) {
-        fprintf(fp, "%04d %04X\n", i, memory->words[i].value);
+        convert_to_base4_address(i, addr_str);
+        convert_to_base4_word(memory->words[i].value, value_str);
+        fprintf(fp, "%s %s\n", addr_str, value_str);
     }
-    
     fclose(fp);
 }
 
 static void write_entry_file(const char *filename, SymbolTable *symtab) {
+    char addr_str[ADDR_LENGTH];
     int i;
     FILE *fp = fopen(filename, "w");
     
@@ -293,13 +397,15 @@ static void write_entry_file(const char *filename, SymbolTable *symtab) {
     
     for (i = 0; i < symtab->count; i++) {
         if (symtab->symbols[i].is_entry) {
-            fprintf(fp, "%s %04d\n", symtab->symbols[i].name, symtab->symbols[i].value);
+            convert_to_base4_address(symtab->symbols[i].value, addr_str);
+            fprintf(fp, "%s %s\n", symtab->symbols[i].name, addr_str);
         }
     }
     fclose(fp);
 }
 
 static void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symtab) {
+    char addr_str[ADDR_LENGTH];
     int i, j;
     FILE *fp = fopen(filename, "w");
     
@@ -308,13 +414,13 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
         return;
     }
     
-    for (i = 0; i < symtab->count; i++) {
-        if (symtab->symbols[i].type == EXTERNAL_SYMBOL) {
-            /* Find all references to this extern */
-            for (j = IC_START; j < IC_START + memory->ic; j++) {
-                if (memory->words[j].value == symtab->symbols[i].value && 
-                    memory->words[j].are == ARE_EXTERNAL) {
-                    fprintf(fp, "%s %04d\n", symtab->symbols[i].name, j);
+    for (j = IC_START; j < IC_START + memory->ic; j++) {
+        if (memory->words[j].are == ARE_EXTERNAL) {
+            for (i = 0; i < symtab->count; i++) {
+                if (symtab->symbols[i].type == EXTERNAL_SYMBOL) {
+                    convert_to_base4_address(j, addr_str);
+                    fprintf(fp, "%s %s\n", symtab->symbols[i].name, addr_str);
+                    break;
                 }
             }
         }
@@ -322,11 +428,12 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
     fclose(fp);
 }
 
-/* Second pass implementation */
+/* Outer regular methods */
+/* ==================================================================== */
 int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory,
                 const char *obj_file, const char *ent_file, const char *ext_file) {
-    int line_num = 0, error_flag = 0;
     char line[MAX_LINE_LENGTH];
+    int line_num = 0, error_flag = 0;
     FILE *fp = fopen(filename, "r");
     
     if (!fp) {
@@ -339,8 +446,8 @@ int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory,
 
     while (fgets(line, sizeof(line), fp)) {
         char **tokens = NULL;
-        int token_count = 0;
-        int i, has_label = 0;
+        int i;
+        int has_label = 0, token_count = 0;
         
         line_num++;
         trim_whitespace(line);
@@ -378,8 +485,7 @@ int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory,
                     fprintf(stderr, "Line %d: Encoding error\n", line_num);
                     error_flag = 1;
                 }
-            }
-            else {
+            } else {
                 fprintf(stderr, "Line %d: Unknown instruction\n", line_num);
                 error_flag = 1;
             }
@@ -391,9 +497,13 @@ int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory,
     /* Only write files if no errors */
     if (!error_flag) {
         write_object_file(obj_file, memory);
+    
+        /* Only create .ent file if there are entry symbols */
         if (has_entries(symtab))
             write_entry_file(ent_file, symtab);
-        if (has_externs(symtab))
+    
+        /* Only create .ext file if there are external references */
+        if (has_externs(symtab) && has_external_references(memory))
             write_extern_file(ext_file, memory, symtab);
     }
     return error_flag ? PASS_ERROR : PASS_SUCCESS;

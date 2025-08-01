@@ -7,8 +7,8 @@
 /* App main method */
 /* ==================================================================== */
 int main(int argc, char *argv[]) {
-    int i, runtime_result, success_count = 0;
-    int total_files = argc - 1;
+    int i, runtime_result;
+    int success_count = 0, total_files = argc - 1;
 
     if (argc < 2) {
         fprintf(stderr, "Expected program call: %s <filename1> [filename2] ... \n", argv[0]);
