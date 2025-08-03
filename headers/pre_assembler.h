@@ -5,10 +5,6 @@
 #define MAX_MACRO_NAME_LENGTH 31  /* 30 chars + null terminator */
 #define MAX_MACRO_BODY 100  /* Max lines per macro */
 
-/* Macro Configuration */
-#define MACRO_START "mcro"
-#define MACRO_END "mcroend"
-
 /* Macro structure */
 typedef struct {
     char name[MAX_MACRO_NAME_LENGTH];

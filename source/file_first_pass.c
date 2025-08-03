@@ -8,6 +8,8 @@
 #include "tokenizer.h"
 #include "instructions.h"
 #include "directives.h"
+#include "symbol_table.h"
+#include "label.h"
 #include "file_io.h"
 
 /* Inner STATIC methods */
@@ -34,9 +36,9 @@ static int process_instruction(char **tokens, int token_count,
     }
     
     inst = get_instruction(tokens[inst_idx]);
-    /* Find instruction */
+
     if (!inst) {
-        print_error(ERR_UNDEFINED_INSTRUCTION, tokens[inst_idx]);
+        print_error(ERR_UNKNOWN_INSTRUCTION, tokens[inst_idx]);
         return FALSE;
     }
 
@@ -50,7 +52,7 @@ static int process_instruction(char **tokens, int token_count,
     if (operand_count != inst->num_operands) {
         char error_msg[100];
         sprintf(error_msg, "Expected %d operands, got %d", inst->num_operands, operand_count);
-        print_error(ERR_INVALID_OPERAND_COUNT, error_msg);
+        print_error(ERR_WRONG_OPERAND_COUNT, error_msg);
         return FALSE;
     }
     
@@ -61,28 +63,23 @@ static int process_instruction(char **tokens, int token_count,
 }
 
 static int process_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
-    if (start_idx >= token_count) 
+    if (start_idx >= token_count)
         return FALSE;
     
-    if (strcmp(tokens[start_idx], DATA_DIRECTIVE) == 0) 
+    if (strcmp(tokens[start_idx], DATA_DIRECTIVE) == 0)
         return process_data_directive(tokens, token_count, start_idx, symtab, memory);
     
-    else if (strcmp(tokens[start_idx], STRING_DIRECTIVE) == 0) 
+    else if (strcmp(tokens[start_idx], STRING_DIRECTIVE) == 0)
         return process_string_directive(tokens, token_count, start_idx, symtab, memory);
     
-    else if (strcmp(tokens[start_idx], MATRIX_DIRECTIVE) == 0) 
+    else if (strcmp(tokens[start_idx], MATRIX_DIRECTIVE) == 0)
         return process_mat_directive(tokens, token_count, start_idx, symtab, memory);
     
     else if (strcmp(tokens[start_idx], ENTRY_DIRECTIVE) == 0)
         return TRUE; /* Handled in second pass */
     
-    else if (strcmp(tokens[start_idx], EXTERN_DIRECTIVE) == 0) {
-        if (token_count != start_idx + 2) {
-            print_error("Invalid extern directive", NULL);
-            return FALSE;
-        }
-        return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
-    }
+    else if (strcmp(tokens[start_idx], EXTERN_DIRECTIVE) == 0)
+        return process_extern_directive(tokens, token_count, start_idx, symtab);
     
     print_error("Unknown directive", tokens[start_idx]);
 

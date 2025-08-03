@@ -24,7 +24,7 @@
 #define DEST_ADDR_BITS 2
 #define ARE_BITS       2
 
-#define MAX_INSTRUCTION_LENGTH 5
+#define MAX_INSTRUCTION_WORDS 5 /* maximum amount an instruction can require in memory. */
 
 /* Addressing Mode Numeric IDs */
 #define ADDR_MODE_IMMEDIATE 0

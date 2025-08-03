@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "utils.h"
 #include "symbols.h"
 #include "instructions.h"
 
@@ -59,7 +60,7 @@ int calc_instruction_length(const Instruction *inst, char **operands, int operan
             /* Immediate - needs extra word */
             length++;
         }
-        else if (strchr(operands[i], LEFT_BRACKET_CHAR)) {
+        else if (strchr(operands[i], MATRIX_LEFT_BRACKET)) {
             /* Matrix - needs 2 extra words */
             length += 2;
         }

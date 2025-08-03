@@ -7,35 +7,90 @@
 #include "errors.h"
 #include "memory.h"
 #include "symbols.h"
+#include "symbol_table.h"
 #include "instructions.h"
 #include "directives.h"
 
-int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+/* Inner STATIC methods */
+/* ==================================================================== */
+static int validate_data_count(int memory_dc) {
+    if (memory_dc >= WORD_COUNT) {
+        print_error("Data section overflow", NULL);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int store_value(MemoryImage *memory, int value) {
+    if (!validate_data_count(memory->dc))
+        return FALSE;
+    
+    memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
+    memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
+    memory->dc++;
+
+    return TRUE;
+}
+
+static int validate_number(const char *token, int *value) {
     char *endptr;
+    
+    *value = strtol(token, &endptr, 10);
+
+    if (*endptr != NULL_TERMINATOR) {
+        print_error(ERR_INVALID_DATA, token);
+        return FALSE;
+    }
+    
+    /* Check range (-512 to 511 for 10-bit signed) */
+    if (*value < -512 || *value > 511) {
+        print_error(ERR_NUMBER_RANGE, token);
+        return FALSE;
+    }
+    
+    return TRUE;
+}
+
+static int validate_string_format(const char *str) {
+    int len = strlen(str);
+    
+    if (len < 2 || str[0] != QUOTATION_CHAR || str[len-1] != QUOTATION_CHAR) {
+        print_error(ERR_INVALID_STRING, str);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols) {
+    if (sscanf(matrix_def, "[%d][%d]", rows, cols) != 2) {
+        print_error(ERR_INVALID_MATRIX, matrix_def);
+        return FALSE;
+    }
+    
+    if (*rows <= 0 || *cols <= 0) {
+        print_error(ERR_INVALID_MATRIX, matrix_def);
+        return FALSE;
+    }
+    
+    return TRUE;
+}
+
+/* Outer regular methods */
+/* ==================================================================== */
+int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
     int i, value;
     
     if (token_count <= start_idx + 1) {
-        print_error("Missing data values", NULL);
+        print_error(ERR_INVALID_DIR_DATA, NULL);
         return FALSE;
     }
     
     for (i = start_idx + 1; i < token_count; i++) {
-        value = strtol(tokens[i], &endptr, 10);
-
-        if (*endptr != NULL_TERMINATOR) {
-            print_error("Invalid data value", tokens[i]);
+        if (!validate_number(tokens[i], &value))
             return FALSE;
-        }
         
-        /* Store data word */
-        if (memory->dc >= WORD_COUNT) {
-            print_error("Data section overflow", NULL);
+        if (!store_value(memory, value))
             return FALSE;
-        }
-        
-        /* Actually store the value */
-        memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
-        memory->dc++;
     }
     return TRUE;
 }
@@ -45,89 +100,55 @@ int process_string_directive(char **tokens, int token_count, int start_idx, Symb
     int i, len;
     
     if (token_count != start_idx + 2) {
-        print_error("Invalid string directive", NULL);
+        print_error(ERR_INVALID_DIR_STRING, NULL);
         return FALSE;
     }
     
     str = tokens[start_idx + 1];
+    if (!validate_string_format(str))
+        return FALSE;
+    
     len = strlen(str);
     
-    /* Remove quotes and store each character */
-    if (len >= 2 && str[0] == '"' && str[len-1] == '"') {
-        /* Store characters without quotes */
-        for (i = 1; i < len - 1; i++) {
-            if (memory->dc >= WORD_COUNT) {
-                print_error("Data section overflow", NULL);
-                return FALSE;
-            }
-            memory->words[IC_START + memory->ic + memory->dc].value = (unsigned char)str[i];
-            memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
-            memory->dc++;
-        }
-    } else {
-        print_error("Invalid string format - missing quotes", str);
-        return FALSE;
+    /* Store characters without quotes */
+    for (i = 1; i < len - 1; i++) {
+        if (!store_value(memory, (unsigned char)str[i]))
+            return FALSE;
     }
     
     /* Add null terminator */
-    if (memory->dc >= WORD_COUNT) {
-        print_error("Data section overflow", NULL);
+    if (!store_value(memory, 0))
         return FALSE;
-    }
-    memory->words[IC_START + memory->ic + memory->dc].value = 0;
-    memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
-    memory->dc++;
     
     return TRUE;
 }
 
 int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
     char *matrix_def;
-    int rows, cols, i;
+    int rows, cols, i, value;
     
-    /* Must have at least .mat [rows][cols] and one value */
     if (token_count <= start_idx + 2) {
-        print_error("Invalid matrix directive", NULL);
+        print_error(ERR_INVALID_DIR_MAT, NULL);
         return FALSE;
     }
     
     matrix_def = tokens[start_idx + 1];
-    
-    /* Parse [rows][cols] */
-    if (sscanf(matrix_def, "[%d][%d]", &rows, &cols) != 2) {
-        print_error("Invalid matrix dimensions", matrix_def);
+    if (!parse_matrix_dimensions(matrix_def, &rows, &cols))
         return FALSE;
-    }
-    
-    /* Validate dimensions */
-    if (rows <= 0 || cols <= 0) {
-        print_error("Invalid matrix dimensions", matrix_def);
-        return FALSE;
-    }
     
     /* Validate number of values */
     if (token_count != start_idx + 2 + (rows * cols)) {
-        print_error("Incorrect number of matrix values", NULL);
+        print_error(ERR_MATRIX_DIM_MISMATCH, NULL);
         return FALSE;
     }
     
     /* Store values */
     for (i = 0; i < rows * cols; i++) {
-        char *endptr;
-        int value = strtol(tokens[start_idx + 2 + i], &endptr, 10);
-        
-        if (*endptr != NULL_TERMINATOR) {
-            print_error("Invalid matrix value", tokens[start_idx + 2 + i]);
+        if (!validate_number(tokens[start_idx + 2 + i], &value))
             return FALSE;
-        }
         
-        if (memory->dc >= WORD_COUNT) {
-            print_error("Data section overflow", NULL);
+        if (!store_value(memory, value))
             return FALSE;
-        }
-        
-        memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
-        memory->dc++;
     }
     return TRUE;
 }
@@ -136,7 +157,7 @@ int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab)
     int i;
     
     if (token_count != 2) {
-        print_error("Invalid entry directive", NULL);
+        print_error(ERR_INVALID_DIR_ENTRY, NULL);
         return FALSE;
     }
     
@@ -147,7 +168,16 @@ int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab)
             return TRUE;
         }
     }
-    print_error(ERR_ENTRY_LABEL_NOT_FOUND, tokens[1]);
-
+    
+    print_error(ERR_ENTRY_NOT_FOUND, tokens[1]);
     return FALSE;
+}
+
+int process_extern_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab) {
+    if (token_count != start_idx + 2) {
+        print_error(ERR_INVALID_DIR_EXTERN, NULL);
+        return FALSE;
+    }
+    
+    return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
 }

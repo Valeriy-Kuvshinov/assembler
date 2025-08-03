@@ -8,6 +8,7 @@
 #include "tokenizer.h"
 #include "instructions.h"
 #include "directives.h"
+#include "symbol_table.h"
 #include "base4.h"
 #include "file_io.h"
 
@@ -46,21 +47,21 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
     temp[MAX_LINE_LENGTH - 1] = NULL_TERMINATOR;
     
     /* Find brackets */
-    open1 = strchr(temp, LEFT_BRACKET_CHAR);
+    open1 = strchr(temp, MATRIX_LEFT_BRACKET);
 
     if (!open1) 
         return FALSE;
 
-    close1 = strchr(open1, RIGHT_BRACKET_CHAR);
+    close1 = strchr(open1, MATRIX_RIGHT_BRACKET);
 
     if (!close1) 
         return FALSE;
     
-    open2 = strchr(close1, LEFT_BRACKET_CHAR);
+    open2 = strchr(close1, MATRIX_LEFT_BRACKET);
     if (!open2) 
         return FALSE;
 
-    close2 = strchr(open2, RIGHT_BRACKET_CHAR);
+    close2 = strchr(open2, MATRIX_RIGHT_BRACKET);
 
     if (!close2) 
         return FALSE;
@@ -121,9 +122,9 @@ static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *
     }
     
     /* Matrix access (label[rX][rY]) */
-    if (strchr(operand, LEFT_BRACKET_CHAR)) {
+    if (strchr(operand, MATRIX_LEFT_BRACKET)) {
         char label[MAX_LABEL_LENGTH];
-        char *bracket = strchr(operand, LEFT_BRACKET_CHAR);
+        char *bracket = strchr(operand, MATRIX_LEFT_BRACKET);
         int base_reg, index_reg;
     
         if (!next_word) {
@@ -171,7 +172,7 @@ static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *
             }
         }
         printf("DEBUG: Symbol '%s' not found in table\n", label);  /* Use label, not operand! */
-        print_error(ERR_UNKNOWN_LABEL, label);  /* Use label, not operand! */
+        print_error(ERR_LABEL_NOT_DEFINED, label);  /* Use label, not operand! */
 
         return FALSE;
     }
@@ -191,7 +192,7 @@ static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *
             return TRUE;
         }
     }
-    print_error(ERR_UNKNOWN_LABEL, operand);
+    print_error(ERR_LABEL_NOT_DEFINED, operand);
     return FALSE;
 }
 
@@ -204,7 +205,7 @@ static int validate_addressing_modes(const Instruction *inst, char **operands, i
         /* Determine addressing mode */
         if (operands[i][0] == IMMEDIATE_PREFIX)
             addr_mode = ADDR_FLAG_IMMEDIATE;
-        else if (strchr(operands[i], LEFT_BRACKET_CHAR))
+        else if (strchr(operands[i], MATRIX_LEFT_BRACKET))
             addr_mode = ADDR_FLAG_MATRIX;
         else if (operands[i][0] == REGISTER_CHAR && isdigit(operands[i][1]) && operands[i][2] == NULL_TERMINATOR)
             addr_mode = ADDR_FLAG_REGISTER;
@@ -228,7 +229,7 @@ static int validate_addressing_modes(const Instruction *inst, char **operands, i
         }
         
         if (!(legal_modes & addr_mode)) {
-            print_error(ERR_ILLEGAL_ADDRESSING_MODE, operands[i]);
+            print_error(ERR_INVALID_ADDRESSING, operands[i]);
             return FALSE;
         }
     }
@@ -257,12 +258,12 @@ static int encode_instruction(const Instruction *inst, char **operands, SymbolTa
     if (!validate_addressing_modes(inst, operands + operand_start, operand_count)) 
         return FALSE;
     
-    /* Get current memory word using separate counter */
+    /* Get current memory word using correct indexing */
     if (*current_ic >= WORD_COUNT) {
         print_error("Code section overflow", NULL);
         return FALSE;
     }
-    current_word = &memory->words[(*current_ic)++];
+    current_word = &memory->words[IC_START + (*current_ic)++];  /* FIX: Add IC_START */
     
     printf("DEBUG: Before encoding %s: current_ic = %d\n", inst->name, *current_ic);
     opcode = get_instruction_opcode(inst->name);
@@ -288,7 +289,7 @@ static int encode_instruction(const Instruction *inst, char **operands, SymbolTa
         
         src_mode = (operands[operand_start][0] == IMMEDIATE_PREFIX) ? 
                   ADDR_MODE_IMMEDIATE : 
-                  (strchr(operands[operand_start], LEFT_BRACKET_CHAR)) ? 
+                  (strchr(operands[operand_start], MATRIX_LEFT_BRACKET)) ? 
                   ADDR_MODE_MATRIX : 
                   (operands[operand_start][0] == REGISTER_CHAR && 
                    isdigit(operands[operand_start][1]) && 
@@ -298,25 +299,7 @@ static int encode_instruction(const Instruction *inst, char **operands, SymbolTa
         
         current_word->value |= (src_mode << SRC_SHIFT);
         
-        /* Store additional operand words if needed */
-        if (src_mode == ADDR_MODE_MATRIX || src_mode == ADDR_MODE_DIRECT || src_mode == ADDR_MODE_IMMEDIATE) {
-            if (*current_ic >= WORD_COUNT) {
-                print_error("Code section overflow", NULL);
-                return FALSE;
-            }
-            memory->words[*current_ic++] = operand_word;
-            
-            /* For matrix addressing, store the second word with registers */
-            if (src_mode == ADDR_MODE_MATRIX) {
-                if (*current_ic >= WORD_COUNT) {
-                    print_error("Code section overflow", NULL);
-                    return FALSE;
-                }
-                memory->words[*current_ic++] = next_operand_word; /* This contains the register encoding */
-            }
-        }
-        
-        /* Encode destination operand */
+        /* Handle destination operand first to check for two-register optimization */
         if (inst->num_operands >= 2) {
             MemoryWord dest_operand_word, dest_next_operand_word;
             
@@ -327,28 +310,101 @@ static int encode_instruction(const Instruction *inst, char **operands, SymbolTa
                         isdigit(operands[operand_start + 1][1]) && 
                         operands[operand_start + 1][2] == NULL_TERMINATOR) ? 
                        ADDR_MODE_REGISTER : 
-                       (strchr(operands[operand_start + 1], LEFT_BRACKET_CHAR)) ?
+                       (strchr(operands[operand_start + 1], MATRIX_LEFT_BRACKET)) ?
                        ADDR_MODE_MATRIX :
                        ADDR_MODE_DIRECT;
             
             current_word->value |= (dest_mode << DEST_SHIFT);
             
-            /* Store additional operand words if needed */
-            if (dest_mode == ADDR_MODE_DIRECT || dest_mode == ADDR_MODE_MATRIX) {
+            /* Check for two-register optimization */
+            if (src_mode == ADDR_MODE_REGISTER && dest_mode == ADDR_MODE_REGISTER) {
+                /* Both registers share one word */
                 if (*current_ic >= WORD_COUNT) {
                     print_error("Code section overflow", NULL);
                     return FALSE;
                 }
-                memory->words[*current_ic++] = dest_operand_word;
-                
-                /* For matrix addressing, store the second word with registers */
-                if (dest_mode == ADDR_MODE_MATRIX) {
+                memory->words[IC_START + (*current_ic)++].value = 
+                    (operand_word.value << 6) | (dest_operand_word.value << 2);
+                memory->words[IC_START + *current_ic - 1].are = ARE_ABSOLUTE;
+                memory->words[IC_START + *current_ic - 1].ext_symbol_index = -1;
+            } else {
+                /* Store source operand if needed */
+                if (src_mode != ADDR_MODE_REGISTER) {
                     if (*current_ic >= WORD_COUNT) {
                         print_error("Code section overflow", NULL);
                         return FALSE;
                     }
-                    memory->words[*current_ic++] = dest_next_operand_word; /* This contains the register encoding */
+                    memory->words[IC_START + (*current_ic)++] = operand_word;
+                    
+                    if (src_mode == ADDR_MODE_MATRIX) {
+                        if (*current_ic >= WORD_COUNT) {
+                            print_error("Code section overflow", NULL);
+                            return FALSE;
+                        }
+                        memory->words[IC_START + (*current_ic)++] = next_operand_word;
+                    }
+                } else {
+                    /* Single register operand */
+                    if (*current_ic >= WORD_COUNT) {
+                        print_error("Code section overflow", NULL);
+                        return FALSE;
+                    }
+                    memory->words[IC_START + (*current_ic)++].value = operand_word.value << 6;
+                    memory->words[IC_START + *current_ic - 1].are = ARE_ABSOLUTE;
+                    memory->words[IC_START + *current_ic - 1].ext_symbol_index = -1;
                 }
+                
+                /* Store destination operand if needed */
+                if (dest_mode != ADDR_MODE_REGISTER) {
+                    if (*current_ic >= WORD_COUNT) {
+                        print_error("Code section overflow", NULL);
+                        return FALSE;
+                    }
+                    memory->words[IC_START + (*current_ic)++] = dest_operand_word;
+                    
+                    if (dest_mode == ADDR_MODE_MATRIX) {
+                        if (*current_ic >= WORD_COUNT) {
+                            print_error("Code section overflow", NULL);
+                            return FALSE;
+                        }
+                        memory->words[IC_START + (*current_ic)++] = dest_next_operand_word;
+                    }
+                } else {
+                    /* Single register operand */
+                    if (*current_ic >= WORD_COUNT) {
+                        print_error("Code section overflow", NULL);
+                        return FALSE;
+                    }
+                    memory->words[IC_START + (*current_ic)++].value = dest_operand_word.value << 2;
+                    memory->words[IC_START + *current_ic - 1].are = ARE_ABSOLUTE;
+                    memory->words[IC_START + *current_ic - 1].ext_symbol_index = -1;
+                }
+            }
+        } else {
+            /* Single operand instruction */
+            if (src_mode != ADDR_MODE_REGISTER) {
+                if (*current_ic >= WORD_COUNT) {
+                    print_error("Code section overflow", NULL);
+                    return FALSE;
+                }
+                memory->words[IC_START + (*current_ic)++] = operand_word;
+                
+                if (src_mode == ADDR_MODE_MATRIX) {
+                    if (*current_ic >= WORD_COUNT) {
+                        print_error("Code section overflow", NULL);
+                        return FALSE;
+                    }
+                    memory->words[IC_START + (*current_ic)++] = next_operand_word;
+                }
+            } else {
+                /* Single register operand */
+                if (*current_ic >= WORD_COUNT) {
+                    print_error("Code section overflow", NULL);
+                    return FALSE;
+                }
+                memory->words[IC_START + (*current_ic)++].value = operand_word.value << 2;
+                memory->words[IC_START + *current_ic - 1].are = ARE_ABSOLUTE;
+                memory->words[IC_START + *current_ic - 1].ext_symbol_index = -1;
             }
         }
     }

@@ -6,45 +6,46 @@
 #include "utils.h"
 #include "errors.h"
 #include "symbols.h"
+#include "label.h"
+#include "symbol_table.h"
 
-int is_valid_label(const char *label) {
+/* Inner STATIC methods */
+/* ==================================================================== */
+static int validate_symbol_addition(const SymbolTable *symtab, const char *name, int type) {
     int i;
     
-    /* Basic validation */
-    if (!label || !*label || strlen(label) >= MAX_LABEL_LENGTH)
-        return FALSE;
-    
-    /* First character must be alphabetic */
-    if (!isalpha((unsigned char)label[0]))
-        return FALSE;
-        
-    /* Subsequent characters must be alphanumeric or underscore*/
-    for (i = 1; label[i]; i++) {
-        if (!isalnum((unsigned char)label[i]) && label[i] != UNDERSCORE_CHAR)
-            return FALSE;
-    }
-    return TRUE;
-}
-
-int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
-    int i;
-    
-    /* Check for duplicates */
+    /* Check for duplicates and conflicts */
     for (i = 0; i < symtab->count; i++) {
         if (strcmp(symtab->symbols[i].name, name) == 0) {
+            /* Check for conflicting attributes */
+            if ((symtab->symbols[i].type == EXTERNAL_SYMBOL && type == ENTRY_SYMBOL) ||
+                (symtab->symbols[i].type == ENTRY_SYMBOL && type == EXTERNAL_SYMBOL)) {
+                print_error(ERR_CONFLICTING_ATTRIB, name);
+                return FALSE;
+            }
             print_error(ERR_DUPLICATE_LABEL, name);
             return FALSE;
         }
     }
     
+    /* Check table capacity */
     if (symtab->count >= MAX_LABELS) {
         print_error("Symbol table overflow", NULL);
         return FALSE;
     }
     
+    return TRUE;
+}
+
+/* Outer regular methods */
+/* ==================================================================== */
+int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
+    /* Validate before adding */
+    if (!validate_symbol_addition(symtab, name, type))
+        return FALSE;
+    
     /* Add new symbol */
     strncpy(symtab->symbols[symtab->count].name, name, MAX_LABEL_LENGTH - 1);
-
     symtab->symbols[symtab->count].name[MAX_LABEL_LENGTH - 1] = NULL_TERMINATOR;
     symtab->symbols[symtab->count].value = value;
     symtab->symbols[symtab->count].type = type;
@@ -55,20 +56,6 @@ int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
     printf("DEBUG: Added symbol '%s' with value=%d, type=%d\n", name, value, type);
     
     return TRUE;
-}
-
-int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
-    char *colon = strchr(label, LABEL_TERMINATOR); /* Remove trailing colon */
-
-    if (colon) 
-        *colon = NULL_TERMINATOR;
-    
-    if (!is_valid_label(label)) {
-        print_error(ERR_LABEL_SYNTAX, label);
-        return FALSE;
-    }
-    
-    return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
 }
 
 int find_symbol(const SymbolTable *symtab, const char *name) {
@@ -84,11 +71,31 @@ int find_symbol(const SymbolTable *symtab, const char *name) {
 
 const Symbol* get_symbol(const SymbolTable *symtab, const char *name) {
     int index = find_symbol(symtab, name);
+
     return (index >= 0) ? &symtab->symbols[index] : NULL;
 }
 
-void init_symbol_table(SymbolTable *symtab) {
-    symtab->count = 0;
+int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
+    char *colon = strchr(label, LABEL_TERMINATOR);
+    
+    /* Check if colon exists */
+    if (!colon) {
+        print_error(ERR_LABEL_MISSING_COLON, label);
+        return FALSE;
+    }
+
+    *colon = NULL_TERMINATOR; /* Remove trailing colon */
+    
+    /* Check for empty label before colon */
+    if (strlen(label) == 0) {
+        print_error(ERR_LABEL_EMPTY, NULL);
+        return FALSE;
+    }
+    
+    if (!is_valid_label(label)) 
+        return FALSE;
+    
+    return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
 }
 
 int has_entries(const SymbolTable *symtab) {
@@ -109,15 +116,4 @@ int has_externs(const SymbolTable *symtab) {
             return TRUE;
     }
     return FALSE;
-}
-
-void update_data_symbol_addresses(SymbolTable *symtab, int ic_final) {
-    int i;
-    
-    /* Update data symbol addresses to come after code section */
-    for (i = 0; i < symtab->count; i++) {
-        if (symtab->symbols[i].type == DATA_SYMBOL) {
-            symtab->symbols[i].value += 100 + ic_final; /* IC_START + final_IC */
-        }
-    }
 }

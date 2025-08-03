@@ -3,7 +3,9 @@
 
 #include "memory.h"
 #include "symbols.h"
+#include "symbol_table.h"
 
+/* Various file extensions */
 #define FILE_EXT_INPUT ".as"
 #define FILE_EXT_PREPROC ".am"
 #define FILE_EXT_OBJECT ".ob"
