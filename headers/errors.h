@@ -12,6 +12,7 @@
 #define ERR_DUPLICATE_MACRO "Duplicate macro name"
 #define ERR_UNEXPECTED_TOKEN "Unexpected token"
 #define ERR_UNDEFINED_INSTRUCTION "Undefined instruction"
+#define ERR_INSTRUCTION_TOO_LONG "Instruction sentence too long"
 #define ERR_INVALID_OPERAND_COUNT "Incorrect number of operands"
 #define ERR_ILLEGAL_ADDRESSING_MODE "Illegal addressing mode"
 #define ERR_LABEL_SYNTAX "Invalid label syntax"

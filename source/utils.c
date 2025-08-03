@@ -5,6 +5,7 @@
 
 #include "utils.h"
 #include "errors.h"
+#include "symbols.h"
 
 void print_error(const char *message, const char *context) {
     if (context)
@@ -43,7 +44,7 @@ void trim_whitespace(char* str) {
     for (i = 0; i <= end - start; i++) {
         str[i] = str[start + i];
     }
-    str[i] = '\0';
+    str[i] = NULL_TERMINATOR;
 }
 
 char *dup_str(const char *src) {

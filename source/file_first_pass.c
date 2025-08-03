@@ -3,249 +3,15 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "file_passer.h"
+#include "utils.h"
+#include "errors.h"
 #include "tokenizer.h"
 #include "instructions.h"
-#include "errors.h"
-#include "utils.h"
+#include "directives.h"
+#include "file_io.h"
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int is_valid_label(const char *label) {
-    int i;
-    
-    /* Basic validation */
-    if (!label || !*label || strlen(label) >= MAX_LABEL_LENGTH)
-        return FALSE;
-    
-    /* First character must be alphabetic */
-    if (!isalpha((unsigned char)label[0]))
-        return FALSE;
-        
-    /* Subsequent characters must be alphanumeric or underscore*/
-    for (i = 1; label[i]; i++) {
-        if (!isalnum((unsigned char)label[i]) && label[i] != '_')
-            return FALSE;
-    }
-    return TRUE;
-}
-
-static int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
-    int i;
-    
-    /* Check for duplicates */
-    for (i = 0; i < symtab->count; i++) {
-        if (strcmp(symtab->symbols[i].name, name) == 0) {
-            print_error(ERR_DUPLICATE_LABEL, name);
-            return FALSE;
-        }
-    }
-    
-    if (symtab->count >= MAX_LABELS) {
-        print_error("Symbol table overflow", NULL);
-        return FALSE;
-    }
-    
-    /* Add new symbol */
-    strncpy(symtab->symbols[symtab->count].name, name, MAX_LABEL_LENGTH - 1);
-
-    symtab->symbols[symtab->count].name[MAX_LABEL_LENGTH - 1] = '\0';
-    symtab->symbols[symtab->count].value = value;
-    symtab->symbols[symtab->count].type = type;
-    symtab->symbols[symtab->count].is_entry = FALSE;
-    symtab->symbols[symtab->count].is_extern = FALSE;
-    symtab->count++;
-    
-    return TRUE;
-}
-
-static int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
-    char *colon = strchr(label, ':'); /* Remove trailing colon */
-
-    if (colon) 
-        *colon = '\0';
-    
-    if (!is_valid_label(label)) {
-        print_error(ERR_LABEL_SYNTAX, label);
-        return FALSE;
-    }
-    
-    return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
-}
-
-static int process_data_directive(char **tokens, int token_count, int start_idx,
-                                 SymbolTable *symtab, MemoryImage *memory) {
-    char *endptr;
-    int i, value;
-    
-    if (token_count <= start_idx + 1) {
-        print_error("Missing data values", NULL);
-        return FALSE;
-    }
-    
-    for (i = start_idx + 1; i < token_count; i++) {
-        value = strtol(tokens[i], &endptr, 10);
-
-        if (*endptr != '\0') {
-            print_error("Invalid data value", tokens[i]);
-            return FALSE;
-        }
-        
-        /* Store data word */
-        if (memory->dc >= WORD_COUNT) {
-            print_error("Data section overflow", NULL);
-            return FALSE;
-        }
-        
-        /* Actually store the value */
-        memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
-        memory->dc++;
-    }
-    return TRUE;
-}
-
-static int process_string_directive(char **tokens, int token_count, int start_idx,
-                                   SymbolTable *symtab, MemoryImage *memory) {
-    char *str;
-    int i;
-    
-    if (token_count != start_idx + 2) {
-        print_error("Invalid string directive", NULL);
-        return FALSE;
-    }
-    
-    str = tokens[start_idx + 1];
-    
-    /* Store each character (excluding quotes) */
-    for (i = 0; str[i]; i++) {
-        if (memory->dc >= WORD_COUNT) {
-            print_error("Data section overflow", NULL);
-            return FALSE;
-        }
-        memory->words[IC_START + memory->ic + memory->dc].value = (unsigned char)str[i];
-        memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
-        memory->dc++;
-    }
-    
-    /* Add null terminator */
-    if (memory->dc >= WORD_COUNT) {
-        print_error("Data section overflow", NULL);
-        return FALSE;
-    }
-    memory->words[IC_START + memory->ic + memory->dc].value = 0;
-    memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
-    memory->dc++;
-    
-    return TRUE;
-}
-
-static int process_mat_directive(char **tokens, int token_count, int start_idx,
-                                SymbolTable *symtab, MemoryImage *memory) {
-    char *matrix_def;
-    int rows, cols, i;
-    
-    /* Must have at least .mat [rows][cols] and one value */
-    if (token_count <= start_idx + 2) {
-        print_error("Invalid matrix directive", NULL);
-        return FALSE;
-    }
-    
-    matrix_def = tokens[start_idx + 1];
-    
-    /* Parse [rows][cols] */
-    if (sscanf(matrix_def, "[%d][%d]", &rows, &cols) != 2) {
-        print_error("Invalid matrix dimensions", matrix_def);
-        return FALSE;
-    }
-    
-    /* Validate dimensions */
-    if (rows <= 0 || cols <= 0) {
-        print_error("Invalid matrix dimensions", matrix_def);
-        return FALSE;
-    }
-    
-    /* Validate number of values */
-    if (token_count != start_idx + 2 + (rows * cols)) {
-        print_error("Incorrect number of matrix values", NULL);
-        return FALSE;
-    }
-    
-    /* Store values */
-    for (i = 0; i < rows * cols; i++) {
-        char *endptr;
-        int value = strtol(tokens[start_idx + 2 + i], &endptr, 10);
-        
-        if (*endptr != '\0') {
-            print_error("Invalid matrix value", tokens[start_idx + 2 + i]);
-            return FALSE;
-        }
-        
-        if (memory->dc >= WORD_COUNT) {
-            print_error("Data section overflow", NULL);
-            return FALSE;
-        }
-        
-        memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
-        memory->dc++;
-    }
-    return TRUE;
-}
-
-static int process_directive(char **tokens, int token_count, int start_idx,
-                            SymbolTable *symtab, MemoryImage *memory) {
-    if (start_idx >= token_count) return FALSE;
-    
-    if (strcmp(tokens[start_idx], ".data") == 0) 
-        return process_data_directive(tokens, token_count, start_idx, symtab, memory);
-    
-    else if (strcmp(tokens[start_idx], ".string") == 0) 
-        return process_string_directive(tokens, token_count, start_idx, symtab, memory);
-    
-    else if (strcmp(tokens[start_idx], ".mat") == 0) 
-        return process_mat_directive(tokens, token_count, start_idx, symtab, memory);
-    
-    else if (strcmp(tokens[start_idx], ".entry") == 0) {
-        /* Handled in second pass */
-        return TRUE;
-    }
-    else if (strcmp(tokens[start_idx], ".extern") == 0) {
-        if (token_count != start_idx + 2) {
-            print_error("Invalid extern directive", NULL);
-            return FALSE;
-        }
-        return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
-    }
-    
-    print_error("Unknown directive", tokens[start_idx]);
-
-    return FALSE;
-}
-
-static int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
-    int i;
-    int length = 1; /* Base instruction word */
-    
-    for (i = 0; i < operand_count; i++) {
-        /* Check addressing mode and add words accordingly */
-        if (operands[i][0] == '#') {
-            /* Immediate - needs extra word */
-            length++;
-        }
-        else if (strchr(operands[i], '[')) {
-            /* Matrix - needs 2 extra words */
-            length += 2;
-        }
-        else if (operands[i][0] == 'r' && isdigit(operands[i][1]) && operands[i][2] == '\0') {
-            /* Register - no extra word needed */
-        }
-        else {
-            /* Direct addressing - needs extra word */
-            length++;
-        }
-    }
-    return length;
-}
-
 static int process_instruction(char **tokens, int token_count, 
                               SymbolTable *symtab, MemoryImage *memory) {
     int operand_start, operand_count, inst_length;
@@ -256,7 +22,7 @@ static int process_instruction(char **tokens, int token_count,
         return FALSE;
     
     /* Check for label */
-    if (strchr(tokens[0], ':')) {
+    if (strchr(tokens[0], LABEL_TERMINATOR)) {
         if (!process_label(tokens[0], symtab, IC_START + memory->ic, FALSE))
             return FALSE;
         inst_idx = 1;
@@ -288,10 +54,39 @@ static int process_instruction(char **tokens, int token_count,
         return FALSE;
     }
     
-    inst_length = calculate_instruction_length(inst, tokens + operand_start, operand_count);
+    inst_length = calc_instruction_length(inst, tokens + operand_start, operand_count);
     memory->ic += inst_length; /* Update instruction counter */
     
     return TRUE;
+}
+
+static int process_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+    if (start_idx >= token_count) 
+        return FALSE;
+    
+    if (strcmp(tokens[start_idx], DATA_DIRECTIVE) == 0) 
+        return process_data_directive(tokens, token_count, start_idx, symtab, memory);
+    
+    else if (strcmp(tokens[start_idx], STRING_DIRECTIVE) == 0) 
+        return process_string_directive(tokens, token_count, start_idx, symtab, memory);
+    
+    else if (strcmp(tokens[start_idx], MATRIX_DIRECTIVE) == 0) 
+        return process_mat_directive(tokens, token_count, start_idx, symtab, memory);
+    
+    else if (strcmp(tokens[start_idx], ENTRY_DIRECTIVE) == 0)
+        return TRUE; /* Handled in second pass */
+    
+    else if (strcmp(tokens[start_idx], EXTERN_DIRECTIVE) == 0) {
+        if (token_count != start_idx + 2) {
+            print_error("Invalid extern directive", NULL);
+            return FALSE;
+        }
+        return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
+    }
+    
+    print_error("Unknown directive", tokens[start_idx]);
+
+    return FALSE;
 }
 
 /* Outer regular methods */
@@ -312,6 +107,13 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
     memory->dc = 0;
     symtab->count = 0;
 
+    /* Initialize memory words */
+    for (i = 0; i < WORD_COUNT; i++) {
+        memory->words[i].value = 0;
+        memory->words[i].are = ARE_ABSOLUTE;
+        memory->words[i].ext_symbol_index = -1;
+    }
+
     while (fgets(line, sizeof(line), fp)) {
         char **tokens = NULL;
         int token_count = 0, has_label = 0, directive_idx = 0;
@@ -320,7 +122,7 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
         trim_whitespace(line);
         
         /* Skip empty/comments */
-        if (line[0] == '\0' || line[0] == COMMENT_CHAR)
+        if (line[0] == NULL_TERMINATOR || line[0] == COMMENT_CHAR)
             continue;
 
         if (!parse_tokens(line, &tokens, &token_count)) {
@@ -335,7 +137,7 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
         }
 
         /* Check for label */
-        if (strchr(tokens[0], ':')) {
+        if (strchr(tokens[0], LABEL_TERMINATOR)) {
             has_label = 1;
             directive_idx = 1;
         }
@@ -372,5 +174,9 @@ int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
             symtab->symbols[i].value += IC_START + memory->ic;
         }
     }
+
+    /* At the end of first_pass, before returning */
+    printf("DEBUG: Final IC = %d, DC = %d\n", memory->ic, memory->dc);
+
     return error_flag ? PASS_ERROR : PASS_SUCCESS;
 }

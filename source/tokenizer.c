@@ -2,8 +2,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "errors.h"
 #include "utils.h"
+#include "errors.h"
+#include "symbols.h"
 #include "tokenizer.h"
 
 /* Inner STATIC methods */
@@ -12,7 +13,7 @@ static int finalize_token(char *current_token, int char_index, char ***tokens,
                          int *token_index, int *token_count, int tokens_capacity) {
     char **temp_tokens = *tokens;
 
-    current_token[char_index] = '\0';
+    current_token[char_index] = NULL_TERMINATOR;
     temp_tokens[*token_index] = dup_str(current_token);
 
     if (!temp_tokens[*token_index]) {
@@ -81,6 +82,7 @@ static int handle_comma(ParseState *state) {
         return FALSE;
 
     state->prev_was_comma = 1;
+
     return TRUE;
 }
 
@@ -90,12 +92,13 @@ static int handle_character(ParseState *state, char c) {
         state->prev_was_comma = 0;
     }
 
-    state->current_token = resize_token(state->current_token, state->char_index, 
-                                       &state->current_token_size);
+    state->current_token = resize_token(state->current_token, state->char_index, &state->current_token_size);
+    
     if (!state->current_token)
         return FALSE;
 
     state->current_token[state->char_index++] = c;
+
     return TRUE;
 }
 

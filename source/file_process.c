@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "errors.h"
 #include "utils.h"
-#include "files.h"
-#include "file_process.h"
-#include "file_passer.h"
+#include "errors.h"
 #include "pre_assembler.h"
+#include "file_io.h"
 
 /* Inner STATIC methods */
 /* ==================================================================== */

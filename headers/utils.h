@@ -9,13 +9,6 @@
 #define FALSE 0
 #define TRUE !FALSE
 
-/* Input Parsing Constants */
-#define COMMENT_CHAR ';'
-#define DIRECTIVE_CHAR '.'
-#define UNDERSCORE_CHAR '_'
-#define LABEL_TERMINATOR ':'
-#define IMMEDIATE_PREFIX '#'
-
 /* Function prototypes */
 
 void print_error(const char *message, const char *context);

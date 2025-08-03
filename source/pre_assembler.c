@@ -3,8 +3,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "errors.h"
 #include "utils.h"
+#include "errors.h"
+#include "symbols.h"
 #include "instructions.h"
 #include "pre_assembler.h"
 
@@ -155,7 +156,7 @@ static void remove_comments(char *line) {
 	char *comment_start = strchr(line, COMMENT_CHAR);
 
 	if (comment_start)
-		*comment_start = '\0';
+		*comment_start = NULL_TERMINATOR;
 }
 
 /* Process macro body line */
@@ -234,7 +235,7 @@ static void expand_macro_call(FILE *am, const char *processed_line, const MacroT
     colon_pos = strchr(temp_line, LABEL_TERMINATOR);
 
     if (colon_pos) {
-        *colon_pos = '\0';
+        *colon_pos = NULL_TERMINATOR;
         fprintf(am, "%s:\n", temp_line);  /* Label on its own line */
 
         macro_name = colon_pos + 1;
@@ -297,7 +298,7 @@ static void init_macro_table(MacroTable *table) {
 
 	for (i = 0; i < MAX_MACROS; i++) {
 		table->macros[i].line_count = 0;
-		table->macros[i].name[0] = '\0';
+		table->macros[i].name[0] = NULL_TERMINATOR;
 	}
 }
 
