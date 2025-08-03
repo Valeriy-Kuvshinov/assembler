@@ -16,5 +16,7 @@ void safe_free(void **ptr);
 void safe_fclose(FILE **fp);
 void trim_whitespace(char* str);
 char *dup_str(const char *src);
+int should_skip_line(const char *line);
+void remove_comments(char *line);
 
 #endif

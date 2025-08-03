@@ -3,7 +3,6 @@
 
 #include "utils.h"
 #include "errors.h"
-#include "pre_assembler.h"
 #include "file_io.h"
 
 /* Inner STATIC methods */
@@ -34,7 +33,6 @@ static int run_preprocessor(const char* input_file, const char* am_file) {
         fprintf(stderr, "Preprocessing failed for %s\n", input_file);
         return FALSE;
     }
-    printf("Preprocessing passed: %s -> %s\n", input_file, am_file);
     return TRUE;
 }
 
@@ -43,7 +41,6 @@ static int run_first_pass(const char* am_file, SymbolTable* symtab, MemoryImage*
         fprintf(stderr, "First pass failed for %s\n", am_file);
         return FALSE;
     }
-    printf("First pass passed: %s\n", am_file);
     return TRUE;
 }
 
@@ -54,7 +51,6 @@ static int run_second_pass(
         fprintf(stderr, "Second pass failed for %s\n", am_file);
         return FALSE;
     }
-    printf("Second pass passed: %s -> %s\n", am_file, obj_file);
     return TRUE;
 }
 

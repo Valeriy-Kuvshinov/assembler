@@ -56,23 +56,14 @@ int calc_instruction_length(const Instruction *inst, char **operands, int operan
     int length = 1; /* Base instruction word */
     
     for (i = 0; i < operand_count; i++) {
-        if (operands[i][0] == IMMEDIATE_PREFIX) {
-            /* Immediate - needs extra word */
+        if (operands[i][0] == IMMEDIATE_PREFIX)
             length++;
-        }
-        else if (strchr(operands[i], MATRIX_LEFT_BRACKET)) {
-            /* Matrix - needs 2 extra words */
+        else if (strchr(operands[i], MATRIX_LEFT_BRACKET))
             length += 2;
-        }
-        else if (operands[i][0] == REGISTER_CHAR && isdigit(operands[i][1]) && operands[i][2] == NULL_TERMINATOR) {
-            /* Register - based on your example, sub r1,r4 = 2 words total */
-            /* So registers still need extra words in your implementation */
+        else if (operands[i][0] == REGISTER_CHAR && isdigit(operands[i][1]) && operands[i][2] == NULL_TERMINATOR)
             length++;
-        }
-        else {
-            /* Direct addressing - needs extra word */
+        else
             length++;
-        }
     }
     
     /* Special case: if instruction has 2 register operands, they can share 1 word */
@@ -80,9 +71,8 @@ int calc_instruction_length(const Instruction *inst, char **operands, int operan
         int reg1 = (operands[0][0] == REGISTER_CHAR && isdigit(operands[0][1]) && operands[0][2] == NULL_TERMINATOR);
         int reg2 = (operands[1][0] == REGISTER_CHAR && isdigit(operands[1][1]) && operands[1][2] == NULL_TERMINATOR);
         
-        if (reg1 && reg2) {
-            length--; /* Both registers share one word, so subtract 1 */
-        }
+        if (reg1 && reg2)
+            length--;
     }
     return length;
 }

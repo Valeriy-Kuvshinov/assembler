@@ -20,7 +20,7 @@ static int validate_symbol_addition(const SymbolTable *symtab, const char *name,
             /* Check for conflicting attributes */
             if ((symtab->symbols[i].type == EXTERNAL_SYMBOL && type == ENTRY_SYMBOL) ||
                 (symtab->symbols[i].type == ENTRY_SYMBOL && type == EXTERNAL_SYMBOL)) {
-                print_error(ERR_CONFLICTING_ATTRIB, name);
+                print_error(ERR_ENTRY_EXTERN_CONFLICT, name);
                 return FALSE;
             }
             print_error(ERR_DUPLICATE_LABEL, name);
@@ -33,7 +33,6 @@ static int validate_symbol_addition(const SymbolTable *symtab, const char *name,
         print_error("Symbol table overflow", NULL);
         return FALSE;
     }
-    
     return TRUE;
 }
 
@@ -62,9 +61,8 @@ int find_symbol(const SymbolTable *symtab, const char *name) {
     int i;
     
     for (i = 0; i < symtab->count; i++) {
-        if (strcmp(symtab->symbols[i].name, name) == 0) {
+        if (strcmp(symtab->symbols[i].name, name) == 0)
             return i;
-        }
     }
     return -1; /* Not found */
 }

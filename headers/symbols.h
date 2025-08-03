@@ -3,6 +3,7 @@
 
 /* Various constants */
 #define COMMENT_CHAR ';'
+#define COMMA_CHAR ','
 #define DIRECTIVE_CHAR '.'
 #define UNDERSCORE_CHAR '_'
 #define LABEL_TERMINATOR ':'

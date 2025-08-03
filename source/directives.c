@@ -25,8 +25,8 @@ static int store_value(MemoryImage *memory, int value) {
     if (!validate_data_count(memory->dc))
         return FALSE;
     
-    memory->words[IC_START + memory->ic + memory->dc].value = value & WORD_MASK;
-    memory->words[IC_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
+    memory->words[INSTRUCTION_START + memory->ic + memory->dc].value = value & WORD_MASK;
+    memory->words[INSTRUCTION_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
     memory->dc++;
 
     return TRUE;
@@ -75,9 +75,7 @@ static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols)
     return TRUE;
 }
 
-/* Outer regular methods */
-/* ==================================================================== */
-int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
     int i, value;
     
     if (token_count <= start_idx + 1) {
@@ -95,7 +93,7 @@ int process_data_directive(char **tokens, int token_count, int start_idx, Symbol
     return TRUE;
 }
 
-int process_string_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_string_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
     char *str;
     int i, len;
     
@@ -123,7 +121,7 @@ int process_string_directive(char **tokens, int token_count, int start_idx, Symb
     return TRUE;
 }
 
-int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
     char *matrix_def;
     int rows, cols, i, value;
     
@@ -153,7 +151,7 @@ int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolT
     return TRUE;
 }
 
-int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab) {
+static int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab) {
     int i;
     
     if (token_count != 2) {
@@ -173,11 +171,57 @@ int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab)
     return FALSE;
 }
 
-int process_extern_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab) {
+static int process_extern_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab) {
     if (token_count != start_idx + 2) {
         print_error(ERR_INVALID_DIR_EXTERN, NULL);
         return FALSE;
     }
     
     return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
+}
+
+/* Outer regular methods */
+/* ==================================================================== */
+int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass) {
+    if (token_count < 1) 
+        return FALSE;
+    
+    if (strcmp(tokens[0], DATA_DIRECTIVE) == 0) {
+        if (is_second_pass) 
+            return TRUE; /* Data already processed in first pass */
+
+        return process_data_directive(tokens, token_count, 0, symtab, memory);
+    }
+    
+    else if (strcmp(tokens[0], STRING_DIRECTIVE) == 0) {
+        if (is_second_pass) 
+            return TRUE; /* String already processed in first pass */
+
+        return process_string_directive(tokens, token_count, 0, symtab, memory);
+    }
+    
+    else if (strcmp(tokens[0], MATRIX_DIRECTIVE) == 0) {
+        if (is_second_pass) 
+            return TRUE; /* Matrix already processed in first pass */
+
+        return process_mat_directive(tokens, token_count, 0, symtab, memory);
+    }
+    
+    else if (strcmp(tokens[0], ENTRY_DIRECTIVE) == 0) {
+        if (!is_second_pass) 
+            return TRUE; /* Entry handled in second pass */
+
+        return process_entry_directive(tokens, token_count, symtab);
+    }
+    
+    else if (strcmp(tokens[0], EXTERN_DIRECTIVE) == 0) {
+        if (is_second_pass) 
+            return TRUE; /* Extern already processed in first pass */
+
+        return process_extern_directive(tokens, token_count, 0, symtab);
+    }
+    
+    print_error("Unknown directive", tokens[0]);
+
+    return FALSE;
 }

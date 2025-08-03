@@ -6,10 +6,6 @@
 
 /* Function prototypes */
 
-int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory);
-int process_string_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory);
-int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory);
-int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab);
-int process_extern_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab);
+int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass);
 
 #endif

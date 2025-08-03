@@ -55,3 +55,14 @@ char *dup_str(const char *src) {
 
     return copy;
 }
+
+int should_skip_line(const char *line) {
+    return (line[0] == NULL_TERMINATOR || line[0] == COMMENT_CHAR);
+}
+
+void remove_comments(char *line) {
+    char *comment_start = strchr(line, COMMENT_CHAR);
+
+    if (comment_start)
+        *comment_start = NULL_TERMINATOR;
+}

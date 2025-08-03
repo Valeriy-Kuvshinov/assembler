@@ -38,7 +38,6 @@ int validate_label_syntax(const char *label) {
             return FALSE;
         }
     }
-    
     return TRUE;
 }
 

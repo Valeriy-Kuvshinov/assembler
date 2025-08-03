@@ -22,8 +22,16 @@
 
 int process_file(const char* base_filename, int file_number, int total_files);
 
+int preprocess_macros(const char* src_filename, const char* am_filename);
+
 int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);
 
 int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory, const char *obj_file, const char *ent_file, const char *ext_file);
+
+FILE *open_source_file(const char *filename);
+
+FILE *open_output_file(const char *filename);
+
+void write_output_files(MemoryImage *memory, SymbolTable *symtab, const char *obj_file, const char *ent_file, const char *ext_file);
 
 #endif

@@ -7,144 +7,69 @@
 #include "errors.h"
 #include "symbols.h"
 #include "instructions.h"
-#include "pre_assembler.h"
+#include "macro_table.h"
+#include "file_io.h"
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-/* Check if macro name is valid */
-static int is_valid_macro_name(const char *name) {
-	size_t len, j;
+static void init_macro_table(MacroTable *table) {
+    int i;
 
-    if (get_instruction(name) != NULL)
-        return FALSE;
+    table->count = 0;
 
-    if (name[0] == DIRECTIVE_CHAR)
-        return FALSE;
-
-    len = strlen(name);
-
-	if (len == 0 || len > MAX_MACRO_NAME_LENGTH - 1)
-		return FALSE;
-
-	if (!isalpha(name[0]))
-		return FALSE;
-
-	for (j = 1; j < len; j++) {
-		if (!isalnum(name[j]) && name[j] != UNDERSCORE_CHAR)
-			return FALSE;
-	}
-	return TRUE;
+    for (i = 0; i < MAX_MACROS; i++) {
+        table->macros[i].line_count = 0;
+        table->macros[i].name[0] = NULL_TERMINATOR;
+    }
 }
 
-/* Add new macro to table */
-static int add_macro(MacroTable *table, const char *name) {
-	int i;
-
-	if (table->count >= MAX_MACROS)
-		return FALSE;
-
-	for (i = 0; i < table->count; i++) {
-		if (strcmp(table->macros[i].name, name) == 0)
-			return FALSE;
-	}
-	strncpy(table->macros[table->count].name, name, MAX_MACRO_NAME_LENGTH);
-
-	table->macros[table->count].line_count = 0;
-	table->count++;
-
-	return TRUE;
-}
-
-/* Check if line is macro definition */
-static int is_macro_definition(const char *line) {
-	char temp[MAX_LINE_LENGTH];
-
-	strcpy(temp, line);
-	trim_whitespace(temp);
-
-	return strncmp(temp, MACRO_START, strlen(MACRO_START)) == 0;
-}
-
-/* Check if line is macro end */
-static int is_macro_end(const char *line) {
-	char temp[MAX_LINE_LENGTH];
-
-	strcpy(temp, line);
-	trim_whitespace(temp);
-
-	return strcmp(temp, MACRO_END) == 0;
-}
-
-/* Find macro by name */
-static const Macro *find_macro(const MacroTable *table, const char *name) {
-	int i;
-
-	for (i = 0; i < table->count; i++) {
-		if (strcmp(table->macros[i].name, name) == 0)
-			return &table->macros[i];
-	}
-	return NULL;
-}
-
-/* Check if line is macro call */
-static int is_macro_call(const char *line, const MacroTable *table) {
-	char temp[MAX_LINE_LENGTH];
-	char *token, *colon_pos;
-
-	strcpy(temp, line);
-	trim_whitespace(temp);
-
-	colon_pos = strchr(temp, LABEL_TERMINATOR);
-
-	if (colon_pos) {
-		token = colon_pos + 1;
-
-		while (isspace((unsigned char) *token))
-			token++;
-
-		token = strtok(token, " \t\n");
-	} else
-		token = strtok(temp, " \t\n");
-
-	if (token)
-		return find_macro(table, token) != NULL;
-
-	return FALSE;
-}
-
-/* Process macro definition line */
-static int process_macro_definition(char *line, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_number) {
+static int validate_macro_definition_syntax(char *line, char **name, int line_number) {
     char context[100];
-    char *name = strtok(line + strlen(MACRO_START), " \t");
-    char *extra = strtok(NULL, " \t\n");
+    char *extra;
 
-    if (!name) {
+    *name = strtok(line + strlen(MACRO_START), " \t");
+
+    if (!*name) {
         sprintf(context, "line %d", line_number);
         print_error(ERR_MISSING_MACRO_NAME, context);
-
         return FALSE;
     }
+
+    extra = strtok(NULL, " \t\n");
 
     if (extra) {
-        sprintf(context, "'%s' after macro name '%s' at line %d", extra, name, line_number);
+        sprintf(context, "'%s' after macro name '%s' at line %d", extra, *name, line_number);
         print_error(ERR_UNEXPECTED_TOKEN, context);
-
         return FALSE;
     }
+    return TRUE;
+}
+
+static int validate_and_add_macro(MacroTable *macro_table, const char *name, int line_number) {
+    char context[100];
 
     if (!is_valid_macro_name(name)) {
         sprintf(context, "'%s' at line %d", name, line_number);
         print_error(ERR_INVALID_MACRO_NAME, context);
-
         return FALSE;
     }
 
     if (!add_macro(macro_table, name)) {
         sprintf(context, "'%s' at line %d", name, line_number);
         print_error(ERR_DUPLICATE_MACRO, context);
-
         return FALSE;
     }
+    return TRUE;
+}
+
+static int process_macro_definition(char *line, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_number) {
+    char *name;
+
+    if (!validate_macro_definition_syntax(line, &name, line_number))
+        return FALSE;
+
+    if (!validate_and_add_macro(macro_table, name, line_number))
+        return FALSE;
 
     *in_macro_definition = 1;
     *current_macro = &macro_table->macros[macro_table->count - 1];
@@ -152,29 +77,24 @@ static int process_macro_definition(char *line, MacroTable *macro_table, Macro *
     return TRUE;
 }
 
-static void remove_comments(char *line) {
-	char *comment_start = strchr(line, COMMENT_CHAR);
+static int validate_macro_end_syntax(char *line, int line_number) {
+    char *extra = strtok(line + strlen(MACRO_END), " \t\n");
 
-	if (comment_start)
-		*comment_start = NULL_TERMINATOR;
+    if (extra) {
+        char context[100];
+
+        sprintf(context, "'%s' after 'endmcro' at line %d", extra, line_number);
+        print_error(ERR_UNEXPECTED_TOKEN, context);
+
+        return FALSE;
+    }
+    return TRUE;
 }
 
-/* Process macro body line */
 static void process_macro_body(const char *original_line, Macro *current_macro, int line_number) {
-    if (current_macro->line_count < MAX_MACRO_BODY) {
-        char temp_body_line[MAX_LINE_LENGTH];
-
-        strcpy(temp_body_line, original_line);
-
-        remove_comments(temp_body_line);
-        trim_whitespace(temp_body_line);
-
-        if (strlen(temp_body_line) > 0) {
-            /* Store the cleaned version, not the original */
-            sprintf(current_macro->body[current_macro->line_count], "%s\n", temp_body_line);
-            current_macro->line_count++;
-        }
-    } else {
+    if (current_macro->line_count < MAX_MACRO_BODY)
+        add_line_to_macro_body(original_line, current_macro);
+    else {
         char context[100];
 
         sprintf(context, "macro '%s', line %d", current_macro->name, line_number);
@@ -182,168 +102,186 @@ static void process_macro_body(const char *original_line, Macro *current_macro, 
     }
 }
 
-/* Collect macro definitions (first pass) */
+static int process_macro_definition_line(char *line, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_number) {
+    if (is_macro_definition(line))
+        return process_macro_definition(line, macro_table, current_macro, in_macro_definition, line_number);
+    
+    return TRUE;
+}
+
+static int process_macro_end_line(char *line, int *in_macro_definition, Macro **current_macro, int line_number) {
+    if (is_macro_end(line)) {
+        if (!validate_macro_end_syntax(line, line_number))
+            return FALSE;
+        
+        *in_macro_definition = 0;
+        *current_macro = NULL;
+
+        return TRUE;
+    }
+    return FALSE; /* Not a macro end line */
+}
+
+static int process_single_line_collection(char *line, char *original_line, MacroTable *macro_table, 
+                                        Macro **current_macro, int *in_macro_definition, int line_number) {
+    remove_comments(line);
+    trim_whitespace(line);
+
+    if (*in_macro_definition) {
+        if (process_macro_end_line(line, in_macro_definition, current_macro, line_number))
+            return TRUE;
+        
+        if (*current_macro)
+            process_macro_body(original_line, *current_macro, line_number);
+    } else {
+        if (!process_macro_definition_line(line, macro_table, current_macro, in_macro_definition, line_number))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 static int collect_macro_definitions(FILE *src, MacroTable *macro_table) {
-	char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH];
-	int in_macro_definition = 0, line_number = 0, error = 0;
-	Macro *current_macro = NULL;
+    char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH];
+    int in_macro_definition = 0, line_number = 0, error = 0;
+    Macro *current_macro = NULL;
 
-	while (fgets(line, MAX_LINE_LENGTH, src)) {
-		line_number++;
-		strcpy(original_line, line);
+    while (fgets(line, MAX_LINE_LENGTH, src)) {
+        line_number++;
+        strcpy(original_line, line);
 
-		remove_comments(line);
-		trim_whitespace(line);
-
-		if (in_macro_definition) {
-            if (is_macro_end(line)) {
-                char *extra = strtok(line + strlen(MACRO_END), " \t\n");
-
-                if (extra) {
-                    char context[100];
-
-                    sprintf(context, "'%s' after 'endmcro' at line %d", extra, line_number);
-                    print_error(ERR_UNEXPECTED_TOKEN, context);
-
-                    error = TRUE;
-                }
-                in_macro_definition = 0;
-                current_macro = NULL;
-
-                continue;
-            }
-
-			if (current_macro)
-				process_macro_body(original_line, current_macro, line_number);
-		} else {
-			if (is_macro_definition(line)) {
-				if (!process_macro_definition(line, macro_table, &current_macro, &in_macro_definition, line_number))
-					error = TRUE;
-			}
-		}
-	}
+        if (!process_single_line_collection(line, original_line, macro_table, &current_macro, &in_macro_definition, line_number))
+            error = TRUE;
+    }
     return (error == 0) ? TRUE : FALSE;
 }
 
-/* Expand macro call */
-static void expand_macro_call(FILE *am, const char *processed_line, const MacroTable *macro_table) {
-    char temp_line[MAX_LINE_LENGTH];
-    char *colon_pos, *macro_name;
-    int i;
-
-    strcpy(temp_line, processed_line);
-    colon_pos = strchr(temp_line, LABEL_TERMINATOR);
-
+static void write_label_if_present(FILE *am, char *temp_line) {
+    char *colon_pos = strchr(temp_line, LABEL_TERMINATOR);
+    
     if (colon_pos) {
         *colon_pos = NULL_TERMINATOR;
-        fprintf(am, "%s:\n", temp_line);  /* Label on its own line */
+        fprintf(am, "%s:\n", temp_line);
+    }
+}
 
+static char *extract_macro_name_for_expansion(char *temp_line) {
+    char *colon_pos = strchr(temp_line, LABEL_TERMINATOR);
+    char *macro_name;
+
+    if (colon_pos) {
         macro_name = colon_pos + 1;
-        while (isspace((unsigned char)*macro_name)) macro_name++;
+
+        while (isspace((unsigned char)*macro_name)) {
+            macro_name++;
+        }
         macro_name = strtok(macro_name, " \t\n");
-    } else 
+    } else
         macro_name = strtok(temp_line, " \t\n");
+
+    return macro_name;
+}
+
+static void write_macro_body(FILE *am, const Macro *macro) {
+    int i;
+    
+    for (i = 0; i < macro->line_count; i++) {
+        fputs(macro->body[i], am);
+    }
+}
+
+static void expand_macro_call(FILE *am, const char *processed_line, const MacroTable *macro_table) {
+    char temp_line[MAX_LINE_LENGTH];
+    char *macro_name;
+
+    strcpy(temp_line, processed_line);
+    
+    write_label_if_present(am, temp_line);
+    macro_name = extract_macro_name_for_expansion(temp_line);
 
     if (macro_name) {
         const Macro *macro = find_macro(macro_table, macro_name);
 
-        if (macro) {
-            /* Write macro body - already has newlines */
-            for (i = 0; i < macro->line_count; i++) {
-                fputs(macro->body[i], am);
-            }
-        }
+        if (macro)
+            write_macro_body(am, macro);
     }
 }
 
-/* Expand macros (second pass) */
-static int expand_macros(FILE *src, FILE *am, const MacroTable *macro_table) {
-	char line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
-	int in_macro_definition = 0;
+static int process_single_line_expansion(char *line, char *processed_line, FILE *am, const MacroTable *macro_table, int *in_macro_definition) {
+    strcpy(processed_line, line);
+    remove_comments(processed_line);
+    trim_whitespace(processed_line);
 
-	while (fgets(line, MAX_LINE_LENGTH, src)) {
-		strcpy(processed_line, line);
+    if (*in_macro_definition) {
+        if (is_macro_end(processed_line))
+            *in_macro_definition = 0;
 
-		remove_comments(processed_line);
-		trim_whitespace(processed_line);
+        return TRUE; /* Skip macro definition lines */
+    }
 
-		if (in_macro_definition) {
-			if (is_macro_end(processed_line))
-				in_macro_definition = 0;
+    if (is_macro_definition(processed_line)) {
+        *in_macro_definition = 1;
+        return TRUE; /* Skip macro definition lines */
+    }
 
-			continue;
-		}
+    if (is_macro_call(processed_line, macro_table)) {
+        expand_macro_call(am, processed_line, macro_table);
+        return TRUE;
+    }
 
-		if (is_macro_definition(processed_line)) {
-			in_macro_definition = 1;
-			continue;
-		}
-
-		if (is_macro_call(processed_line, macro_table)) {
-			expand_macro_call(am, processed_line, macro_table);
-			continue;
-		}
-
-        if (strlen(processed_line) > 0) 
-            fprintf(am, "%s\n", processed_line);
-	}
-	return TRUE;
+    if (!should_skip_line(processed_line))
+        fprintf(am, "%s\n", processed_line);
+    
+    return TRUE;
 }
 
-/* Initialize macro table */
-static void init_macro_table(MacroTable *table) {
-	int i;
+static int expand_macros(FILE *src, FILE *am, const MacroTable *macro_table) {
+    char line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
+    int in_macro_definition = 0;
 
-	table->count = 0;
-
-	for (i = 0; i < MAX_MACROS; i++) {
-		table->macros[i].line_count = 0;
-		table->macros[i].name[0] = NULL_TERMINATOR;
-	}
+    while (fgets(line, MAX_LINE_LENGTH, src)) {
+        if (!process_single_line_expansion(line, processed_line, am, macro_table, &in_macro_definition))
+            return FALSE;
+    }
+    return TRUE;
 }
 
 /* Outer regular methods */
 /* ==================================================================== */
 int preprocess_macros(const char *src_filename, const char *am_filename) {
-	FILE *src, *am;
-	MacroTable macro_table;
+    FILE *src, *am;
+    MacroTable macro_table;
 
-	init_macro_table(&macro_table);
+    init_macro_table(&macro_table);
 
-	src = fopen(src_filename, "r");
+    src = open_source_file(src_filename);
 
-	if (!src) {
-		perror("Error opening source file");
-		return FALSE;
-	}
+    if (!src)
+        return FALSE;
 
-	/* First pass: collect macro definitions */
-	if (!collect_macro_definitions(src, &macro_table)) {
-		safe_fclose(&src);
-		return FALSE;
-	}
+    /* First pass: collect macro definitions */
+    if (!collect_macro_definitions(src, &macro_table)) {
+        safe_fclose(&src);
+        return FALSE;
+    }
 
-	rewind(src);
+    rewind(src);
 
-	am = fopen(am_filename, "w"); /* Open output file */
+    am = open_output_file(am_filename);
 
-	if (!am) {
-		perror("Error creating output file");
-		safe_fclose(&src);
+    if (!am) {
+        safe_fclose(&src);
+        return FALSE;
+    }
 
-		return FALSE;
-	}
+    /* Second pass: expand macros */
+    if (!expand_macros(src, am, &macro_table)) {
+        safe_fclose(&src);
+        safe_fclose(&am);
+        return FALSE;
+    }
 
-	/* Second pass: expand macros */
-	if (!expand_macros(src, am, &macro_table)) {
-		safe_fclose(&src);
-		safe_fclose(&am);
+    safe_fclose(&src);
+    safe_fclose(&am);
 
-		return FALSE;
-	}
-
-	safe_fclose(&src);
-	safe_fclose(&am);
-
-	return TRUE;
+    return TRUE;
 }

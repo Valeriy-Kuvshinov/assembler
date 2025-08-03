@@ -58,9 +58,9 @@ static void cleanup_parsing(char *current_token, char **tokens, int token_count)
 static int handle_whitespace(ParseState *state) {
     if (state->in_token) {
         if (!finalize_token(state->current_token, state->char_index, &state->tokens, 
-                          &state->token_index, state->token_count, state->tokens_capacity)) {
+                          &state->token_index, state->token_count, state->tokens_capacity))
             return FALSE;
-        }
+        
         state->in_token = 0;
         state->char_index = 0;
     }
@@ -105,7 +105,7 @@ static int handle_character(ParseState *state, char c) {
 static int process_character(ParseState *state, char c) {
     if (isspace((unsigned char)c))
         return handle_whitespace(state);
-    else if (c == ',')
+    else if (c == COMMA_CHAR)
         return handle_comma(state);
     else
         return handle_character(state, c);
