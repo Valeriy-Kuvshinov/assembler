@@ -49,7 +49,14 @@ typedef struct {
 /* Function prototypes */
 
 int get_instruction_opcode(const char *name);
+
 const Instruction* get_instruction(const char *name);
+
 int calc_instruction_length(const Instruction *inst, char **operands, int operand_count);
+
+/* Validation macros */
+
+#define IS_INSTRUCTION(name) \
+    (get_instruction(name) != NULL)
 
 #endif

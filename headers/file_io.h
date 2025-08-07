@@ -2,7 +2,6 @@
 #define FILE_IO_H
 
 #include "memory.h"
-#include "symbols.h"
 #include "symbol_table.h"
 
 /* Various file extensions */
@@ -20,18 +19,24 @@
 
 /* Function prototypes */
 
-int process_file(const char* base_filename, int file_number, int total_files);
+void build_files(
+    const char* base_filename, char* input_file, char* am_file,
+    char* obj_file, char* ent_file, char* ext_file
+);
 
-int preprocess_macros(const char* src_filename, const char* am_filename);
-
-int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);
-
-int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory, const char *obj_file, const char *ent_file, const char *ext_file);
+void safe_fclose(FILE **fp);
 
 FILE *open_source_file(const char *filename);
 
 FILE *open_output_file(const char *filename);
 
-void write_output_files(MemoryImage *memory, SymbolTable *symtab, const char *obj_file, const char *ent_file, const char *ext_file);
+int preprocess_macros(const char* src_filename, const char* am_filename);
+
+int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);
+
+int second_pass(
+    const char *filename, SymbolTable *symtab, MemoryImage *memory,
+    const char *obj_file, const char *ent_file, const char *ext_file
+);
 
 #endif

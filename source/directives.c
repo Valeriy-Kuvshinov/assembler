@@ -6,7 +6,6 @@
 #include "utils.h"
 #include "errors.h"
 #include "memory.h"
-#include "symbols.h"
 #include "symbol_table.h"
 #include "instructions.h"
 #include "directives.h"
@@ -14,7 +13,7 @@
 /* Inner STATIC methods */
 /* ==================================================================== */
 static int validate_data_count(int memory_dc) {
-    if (memory_dc >= WORD_COUNT) {
+    if (memory_dc >= MAX_DC_SIZE) {
         print_error("Data section overflow", NULL);
         return FALSE;
     }
@@ -44,10 +43,9 @@ static int validate_number(const char *token, int *value) {
     
     /* Check range (-512 to 511 for 10-bit signed) */
     if (*value < -512 || *value > 511) {
-        print_error(ERR_NUMBER_RANGE, token);
+        print_error("Number out of range (-512 - 511)", token);
         return FALSE;
     }
-    
     return TRUE;
 }
 
@@ -71,13 +69,13 @@ static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols)
         print_error(ERR_INVALID_MATRIX, matrix_def);
         return FALSE;
     }
-    
     return TRUE;
 }
 
-static int process_data_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_data_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     int i, value;
-    
+    int start_idx = 0;
+
     if (token_count <= start_idx + 1) {
         print_error(ERR_INVALID_DIR_DATA, NULL);
         return FALSE;
@@ -93,16 +91,18 @@ static int process_data_directive(char **tokens, int token_count, int start_idx,
     return TRUE;
 }
 
-static int process_string_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_string_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *str;
     int i, len;
-    
+    int start_idx = 0;
+
     if (token_count != start_idx + 2) {
         print_error(ERR_INVALID_DIR_STRING, NULL);
         return FALSE;
     }
     
     str = tokens[start_idx + 1];
+
     if (!validate_string_format(str))
         return FALSE;
     
@@ -110,7 +110,7 @@ static int process_string_directive(char **tokens, int token_count, int start_id
     
     /* Store characters without quotes */
     for (i = 1; i < len - 1; i++) {
-        if (!store_value(memory, (unsigned char)str[i]))
+        if (!store_value(memory, str[i]))
             return FALSE;
     }
     
@@ -121,16 +121,18 @@ static int process_string_directive(char **tokens, int token_count, int start_id
     return TRUE;
 }
 
-static int process_mat_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab, MemoryImage *memory) {
+static int process_mat_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *matrix_def;
     int rows, cols, i, value;
-    
+    int start_idx = 0;
+
     if (token_count <= start_idx + 2) {
         print_error(ERR_INVALID_DIR_MAT, NULL);
         return FALSE;
     }
     
     matrix_def = tokens[start_idx + 1];
+
     if (!parse_matrix_dimensions(matrix_def, &rows, &cols))
         return FALSE;
     
@@ -166,12 +168,12 @@ static int process_entry_directive(char **tokens, int token_count, SymbolTable *
             return TRUE;
         }
     }
-    
-    print_error(ERR_ENTRY_NOT_FOUND, tokens[1]);
     return FALSE;
 }
 
-static int process_extern_directive(char **tokens, int token_count, int start_idx, SymbolTable *symtab) {
+static int process_extern_directive(char **tokens, int token_count, SymbolTable *symtab) {
+    int start_idx = 0;
+
     if (token_count != start_idx + 2) {
         print_error(ERR_INVALID_DIR_EXTERN, NULL);
         return FALSE;
@@ -190,21 +192,21 @@ int process_directive(char **tokens, int token_count, SymbolTable *symtab, Memor
         if (is_second_pass) 
             return TRUE; /* Data already processed in first pass */
 
-        return process_data_directive(tokens, token_count, 0, symtab, memory);
+        return process_data_directive(tokens, token_count, symtab, memory);
     }
     
     else if (strcmp(tokens[0], STRING_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* String already processed in first pass */
 
-        return process_string_directive(tokens, token_count, 0, symtab, memory);
+        return process_string_directive(tokens, token_count, symtab, memory);
     }
     
     else if (strcmp(tokens[0], MATRIX_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* Matrix already processed in first pass */
 
-        return process_mat_directive(tokens, token_count, 0, symtab, memory);
+        return process_mat_directive(tokens, token_count, symtab, memory);
     }
     
     else if (strcmp(tokens[0], ENTRY_DIRECTIVE) == 0) {
@@ -218,10 +220,7 @@ int process_directive(char **tokens, int token_count, SymbolTable *symtab, Memor
         if (is_second_pass) 
             return TRUE; /* Extern already processed in first pass */
 
-        return process_extern_directive(tokens, token_count, 0, symtab);
+        return process_extern_directive(tokens, token_count, symtab);
     }
-    
-    print_error("Unknown directive", tokens[0]);
-
     return FALSE;
 }

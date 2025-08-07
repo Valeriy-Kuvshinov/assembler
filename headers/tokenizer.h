@@ -20,6 +20,7 @@ typedef struct {
 /* Function prototypes */
 
 int parse_tokens(const char *line, char ***tokens_ptr, int *token_count);
+
 void free_tokens(char **tokens, int token_count);
 
 #endif
