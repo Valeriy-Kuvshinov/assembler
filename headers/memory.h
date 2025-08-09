@@ -33,6 +33,16 @@ typedef struct {
     int dc;                        /* Data counter */
 } MemoryImage;
 
+/* Function prototypes */
+
+void init_memory(MemoryImage *memory);
+
+int validate_ic_limit(int current_ic);
+
+int validate_dc_limit(int current_dc);
+
+int store_value(MemoryImage *memory, int value);
+
 /* Validation macros */
 
 #define IS_REGISTER(str) \

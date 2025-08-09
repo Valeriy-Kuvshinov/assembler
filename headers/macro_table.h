@@ -1,7 +1,8 @@
 #ifndef MACRO_TABLE_H
 #define MACRO_TABLE_H
 
-#define MAX_MACROS 25             /* Maximum number of macros */
+#define INITIAL_MACROS_CAPACITY 8
+
 #define MAX_MACRO_NAME_LENGTH 31  /* 30 chars + null terminator */
 #define MAX_MACRO_BODY 50         /* Max lines per macro */
 
@@ -16,17 +17,22 @@ typedef struct {
 } Macro;
 
 typedef struct {
-    Macro macros[MAX_MACROS];
-    int count;
+    Macro *macros;   /* dynamic array of macros */
+    int count;       /* number of macros in use */
+    int capacity;    /* total allocated macro slots */
 } MacroTable;
 
 /* Function prototypes */
 
+int init_macro_table(MacroTable *table);
+
+void free_macro_table(MacroTable *table);
+
 int is_valid_macro_start(const char *name);
 
-int store_macro(MacroTable *table, const char *name);
-
 const Macro *find_macro(const MacroTable *table, const char *name);
+
+int add_macro(MacroTable *table, const char *name);
 
 int is_macro_call(const char *line, const MacroTable *table);
 

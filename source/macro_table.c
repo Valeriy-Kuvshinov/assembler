@@ -12,6 +12,34 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
+static int resize_macro_table(MacroTable *table) {
+    int new_capacity = (table->capacity == 0) ? INITIAL_MACROS_CAPACITY : table->capacity * 2;
+    Macro *new_macros = realloc(table->macros, new_capacity * sizeof(Macro));
+
+    if (!new_macros) {
+        print_error(ERR_MEMORY_ALLOCATION, "Failed to resize macro table");
+        return FALSE;
+    }
+    table->macros = new_macros;
+    table->capacity = new_capacity;
+
+    return TRUE;
+}
+
+static int validate_macro_addition(const MacroTable *table, const char *name) {
+    if (!table) {
+        print_error("Macro table not initialized", NULL);
+        return FALSE;
+    }
+
+    if (find_macro(table, name) != NULL) {
+        print_error("Duplicate macro name", name);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static int is_valid_syntax(const char *macro) {
     int i;
     
@@ -62,8 +90,35 @@ static int is_reserved_word(const char *macro) {
     return FALSE;
 }
 
+static void store_macro(MacroTable *table, const char *name) {
+    strncpy(table->macros[table->count].name, name, MAX_MACRO_NAME_LENGTH - 1);
+
+    table->macros[table->count].name[MAX_MACRO_NAME_LENGTH - 1] = NULL_TERMINATOR;
+    table->macros[table->count].line_count = 0;
+    table->count++;
+}
+
 /* Outer regular methods */
 /* ==================================================================== */
+int init_macro_table(MacroTable *table) {
+    table->macros = malloc(INITIAL_MACROS_CAPACITY * sizeof(Macro));
+    if (!table->macros) {
+        print_error(ERR_MEMORY_ALLOCATION, "Failed to initialize macro table");
+        return FALSE;
+    }
+    table->count = 0;
+    table->capacity = INITIAL_MACROS_CAPACITY;
+
+    return TRUE;
+}
+
+void free_macro_table(MacroTable *table) {
+    safe_free((void**)&table->macros);
+
+    table->count = 0;
+    table->capacity = 0;
+}
+
 int is_valid_macro_start(const char *macro) {
     if (!is_valid_syntax(macro))
         return FALSE;
@@ -71,26 +126,6 @@ int is_valid_macro_start(const char *macro) {
     if (is_reserved_word(macro))
         return FALSE;
     
-    return TRUE;
-}
-
-int store_macro(MacroTable *table, const char *macro) {
-    if (table->count >= MAX_MACROS){
-        print_error("Exceeded macro amount limit", macro);
-        return FALSE;
-    }
-
-    if (find_macro(table, macro) != NULL){
-        print_error("Duplicate macro name", macro);
-        return FALSE;
-    }
-
-    strncpy(table->macros[table->count].name, macro, MAX_MACRO_NAME_LENGTH - 1);
-
-    table->macros[table->count].name[MAX_MACRO_NAME_LENGTH - 1] = NULL_TERMINATOR;
-    table->macros[table->count].line_count = 0;
-    table->count++;
-
     return TRUE;
 }
 
@@ -102,6 +137,19 @@ const Macro *find_macro(const MacroTable *table, const char *macro) {
             return &table->macros[i];
     }
     return NULL;
+}
+
+int add_macro(MacroTable *table, const char *name) {
+    if (!validate_macro_addition(table, name))
+        return FALSE;
+
+    if (table->count >= table->capacity) {
+        if (!resize_macro_table(table))
+            return FALSE;
+    }
+    store_macro(table, name);
+
+    return TRUE;
 }
 
 int is_macro_call(const char *line, const MacroTable *table) {

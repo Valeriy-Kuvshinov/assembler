@@ -8,27 +8,74 @@
 #include "instructions.h"
 
 const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
-    /* Group 0: Two operands */
-    {"mov",  TWO_OPERANDS, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"cmp",  TWO_OPERANDS, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"add",  TWO_OPERANDS, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"sub",  TWO_OPERANDS, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"lea",  TWO_OPERANDS, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX},
-    
-    /* Group 1: One operand */
-    {"clr",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"not",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"inc",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"dec",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"jmp",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"bne",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"jsr",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"red",  ONE_OPERAND, 0, ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    {"prn",  ONE_OPERAND, 0, ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER},
-    
-    /* Group 2: No operands */
-    {"rts",  NO_OPERANDS, 0, 0},
-    {"stop", NO_OPERANDS, 0, 0}
+  /* Group 0: Two operands */
+  {
+    "mov", TWO_OPERANDS,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "cmp", TWO_OPERANDS,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "add", TWO_OPERANDS,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "sub", TWO_OPERANDS,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "lea", TWO_OPERANDS,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX
+  },
+
+  /* Group 1: One operand */
+  {
+    "clr", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "not", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "inc", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "dec", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "jmp", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "bne", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "jsr", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "red", ONE_OPERAND, 0,
+    ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+  {
+    "prn", ONE_OPERAND, 0,
+    ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
+  },
+
+  /* Group 2: No operands */
+  {"rts", NO_OPERANDS, 0, 0},
+  {"stop", NO_OPERANDS, 0, 0}
 };
 
 const Instruction* get_instruction(const char *name) {
@@ -51,7 +98,7 @@ int get_instruction_opcode(const char *name) {
     return -1; /* Not found */
 }
 
-int calc_instruction_length(const Instruction *inst, char **operands, int operand_count) {
+int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
     int i;
     int length = 1; /* Base instruction word */
     
@@ -80,4 +127,48 @@ int calc_instruction_length(const Instruction *inst, char **operands, int operan
             length--;
     }
     return length;
+}
+
+int get_operand_addressing_mode(const char *operand) {
+    if (operand[0] == IMMEDIATE_PREFIX)
+        return ADDR_MODE_IMMEDIATE;
+    else if (strchr(operand, LEFT_BRACKET))
+        return ADDR_MODE_MATRIX;
+    else if (operand[0] == REGISTER_CHAR && isdigit(operand[1]) && operand[2] == NULL_TERMINATOR)
+        return ADDR_MODE_REGISTER;
+    else
+        return ADDR_MODE_DIRECT;
+}
+
+int validate_instruction_operands_addressing_modes(const Instruction *inst, char **operands, int operand_count) {
+    int i;
+    
+    for (i = 0; i < operand_count; i++) {
+        int addr_mode_flag, legal_modes;;
+        
+        addr_mode_flag = get_operand_addressing_mode(operands[i]);
+        
+        /* Determine the legal addressing modes based on operand position (source/destination) */
+        switch (inst->num_operands) {
+            case TWO_OPERANDS:
+                legal_modes = (i == 0) ? inst->legal_src_addr_modes : inst->legal_dest_addr_modes;
+                break;
+            case ONE_OPERAND:
+                legal_modes = inst->legal_dest_addr_modes;
+                break;
+            case NO_OPERANDS:
+                legal_modes = 0; /* No operands, so no legal modes */
+                break;
+            default:
+                /* This case should ideally not be reached if inst->num_operands is correctly set */
+                print_error("Internal error: Invalid number of operands for instruction", inst->name);
+                return FALSE;
+        }
+        /* Check if the operand's addressing mode is allowed */
+        if (!(legal_modes & (1 << addr_mode_flag))) { /* Convert ADDR_MODE_X to ADDR_FLAG_X */
+            print_error("Invalid addressing mode for instruction operand", operands[i]);
+            return FALSE;
+        }
+    }
+    return TRUE;
 }

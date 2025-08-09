@@ -12,61 +12,28 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int validate_data_count(int memory_dc) {
-    if (memory_dc >= MAX_DC_SIZE) {
-        print_error("Data section overflow", NULL);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static int store_value(MemoryImage *memory, int value) {
-    if (!validate_data_count(memory->dc))
-        return FALSE;
-    
-    memory->words[INSTRUCTION_START + memory->ic + memory->dc].value = value & WORD_MASK;
-    memory->words[INSTRUCTION_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
-    memory->dc++;
-
-    return TRUE;
-}
-
 static int validate_number(const char *token, int *value) {
     char *endptr;
     
     *value = strtol(token, &endptr, 10);
 
     if (*endptr != NULL_TERMINATOR) {
-        print_error(ERR_INVALID_DATA, token);
+        print_error(".data value must be decimal integer (-512 - 511)", token);
         return FALSE;
     }
     
-    /* Check range (-512 to 511 for 10-bit signed) */
     if (*value < -512 || *value > 511) {
-        print_error("Number out of range (-512 - 511)", token);
+        print_error("Number out of signed decimal integer range (-512 - 511)", token);
         return FALSE;
     }
     return TRUE;
 }
 
-static int validate_string_format(const char *str) {
+static int validate_string(const char *str) {
     int len = strlen(str);
     
     if (len < 2 || str[0] != QUOTATION_CHAR || str[len-1] != QUOTATION_CHAR) {
-        print_error(ERR_INVALID_STRING, str);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols) {
-    if (sscanf(matrix_def, "[%d][%d]", rows, cols) != 2) {
-        print_error(ERR_INVALID_MATRIX, matrix_def);
-        return FALSE;
-    }
-    
-    if (*rows <= 0 || *cols <= 0) {
-        print_error(ERR_INVALID_MATRIX, matrix_def);
+        print_error("String must be in double quotes", str);
         return FALSE;
     }
     return TRUE;
@@ -77,7 +44,7 @@ static int process_data_directive(char **tokens, int token_count, SymbolTable *s
     int start_idx = 0;
 
     if (token_count <= start_idx + 1) {
-        print_error(ERR_INVALID_DIR_DATA, NULL);
+        print_error("Invalid data directive", NULL);
         return FALSE;
     }
     
@@ -97,27 +64,38 @@ static int process_string_directive(char **tokens, int token_count, SymbolTable 
     int start_idx = 0;
 
     if (token_count != start_idx + 2) {
-        print_error(ERR_INVALID_DIR_STRING, NULL);
+        print_error("Invalid string directive", NULL);
         return FALSE;
     }
     
     str = tokens[start_idx + 1];
 
-    if (!validate_string_format(str))
+    if (!validate_string(str))
         return FALSE;
     
     len = strlen(str);
     
-    /* Store characters without quotes */
     for (i = 1; i < len - 1; i++) {
         if (!store_value(memory, str[i]))
             return FALSE;
     }
     
-    /* Add null terminator */
     if (!store_value(memory, 0))
         return FALSE;
     
+    return TRUE;
+}
+
+static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols) {
+    if (sscanf(matrix_def, "[%d][%d]", rows, cols) != 2) {
+        print_error(ERR_INVALID_MATRIX, matrix_def);
+        return FALSE;
+    }
+    
+    if (*rows <= 0 || *cols <= 0) {
+        print_error(ERR_INVALID_MATRIX, matrix_def);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -127,7 +105,7 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
     int start_idx = 0;
 
     if (token_count <= start_idx + 2) {
-        print_error(ERR_INVALID_DIR_MAT, NULL);
+        print_error("Invalid matrix directive", NULL);
         return FALSE;
     }
     
@@ -138,7 +116,7 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
     
     /* Validate number of values */
     if (token_count != start_idx + 2 + (rows * cols)) {
-        print_error(ERR_MATRIX_DIM_MISMATCH, NULL);
+        print_error("Matrix dimensions don't match values", NULL);
         return FALSE;
     }
     
@@ -157,7 +135,7 @@ static int process_entry_directive(char **tokens, int token_count, SymbolTable *
     int i;
     
     if (token_count != 2) {
-        print_error(ERR_INVALID_DIR_ENTRY, NULL);
+        print_error("Invalid entry directive", NULL);
         return FALSE;
     }
     
@@ -175,7 +153,7 @@ static int process_extern_directive(char **tokens, int token_count, SymbolTable 
     int start_idx = 0;
 
     if (token_count != start_idx + 2) {
-        print_error(ERR_INVALID_DIR_EXTERN, NULL);
+        print_error("Invalid extern directive", NULL);
         return FALSE;
     }
     

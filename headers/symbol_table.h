@@ -1,6 +1,8 @@
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
+#define INITIAL_SYMBOLS_CAPACITY 8
+
 #define MAX_LABEL_NAME_LENGTH 31 /* Max label name length (30 + null terminator) */
 
 /* Symbol Types */
@@ -29,13 +31,15 @@ int init_symbol_table(SymbolTable *symtab);
 
 void free_symbol_table(SymbolTable *symtab);
 
+void extract_label_name(char *label);
+
 int add_symbol(SymbolTable *symtab, const char *name, int value, int type);
 
 int has_entries(const SymbolTable *symtab);
 
 int has_externs(const SymbolTable *symtab);
 
-int is_valid_label(const char *label);
+int is_valid_label(char *label);
 
 int process_label(char *label, SymbolTable *symtab, int address, int is_data);
 

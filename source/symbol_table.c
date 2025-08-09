@@ -13,14 +13,13 @@
 /* Inner STATIC methods */
 /* ==================================================================== */
 static int resize_symbol_table(SymbolTable *symtab) {
-    int new_capacity = (symtab->capacity == 0) ? 4 : symtab->capacity * 2;
+    int new_capacity = (symtab->capacity == 0) ? INITIAL_SYMBOLS_CAPACITY : symtab->capacity * 2;
     Symbol *new_symbols = realloc(symtab->symbols, new_capacity * sizeof(Symbol));
     
     if (!new_symbols) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to resize symbol table");
         return FALSE;
     }
-    
     symtab->symbols = new_symbols;
     symtab->capacity = new_capacity;
 
@@ -30,7 +29,6 @@ static int resize_symbol_table(SymbolTable *symtab) {
 static int validate_symbol_addition(const SymbolTable *symtab, const char *symbol, int type) {
     int i;
 
-    /* Check for NULL table */
     if (!symtab) {
         print_error("Symbol table not initialized", NULL);
         return FALSE;
@@ -109,23 +107,44 @@ static int is_reserved_word(const char *label) {
     return FALSE;
 }
 
+static void store_symbol(SymbolTable *symtab, const char *name, int value, int type) {
+    strncpy(symtab->symbols[symtab->count].name, name, MAX_LABEL_NAME_LENGTH - 1);
+
+    symtab->symbols[symtab->count].name[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
+    symtab->symbols[symtab->count].value = value;
+    symtab->symbols[symtab->count].type = type;
+    symtab->symbols[symtab->count].is_entry = (type == ENTRY_SYMBOL);
+    symtab->symbols[symtab->count].is_extern = (type == EXTERNAL_SYMBOL);
+    symtab->count++;
+}
+
 /* Outer regular methods */
 /* ==================================================================== */
 int init_symbol_table(SymbolTable *symtab) {
-    symtab->symbols = NULL;
+    symtab->symbols = malloc(INITIAL_SYMBOLS_CAPACITY * sizeof(Symbol));
+
+    if (!symtab->symbols) {
+        print_error(ERR_MEMORY_ALLOCATION, "Failed to initialize symbol table");
+        return FALSE;
+    }
     symtab->count = 0;
-    symtab->capacity = 0;
+    symtab->capacity = INITIAL_SYMBOLS_CAPACITY;
 
     return TRUE;
 }
 
 void free_symbol_table(SymbolTable *symtab) {
-    if (symtab->symbols) {
-        free(symtab->symbols);
-        symtab->symbols = NULL;
-    }
+    safe_free((void**)&symtab->symbols);
+
     symtab->count = 0;
     symtab->capacity = 0;
+}
+
+void extract_label_name(char *label) {
+    char *colon = strchr(label, LABEL_TERMINATOR);
+
+    if (colon)
+        *colon = NULL_TERMINATOR; /* Remove the colon */
 }
 
 int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
@@ -136,15 +155,7 @@ int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
         if (!resize_symbol_table(symtab))
             return FALSE;
     }
-    
-    /* Add new symbol */
-    strncpy(symtab->symbols[symtab->count].name, name, MAX_LABEL_NAME_LENGTH - 1);
-    symtab->symbols[symtab->count].name[MAX_LABEL_NAME_LENGTH - 1] = '\0';
-    symtab->symbols[symtab->count].value = value;
-    symtab->symbols[symtab->count].type = type;
-    symtab->symbols[symtab->count].is_entry = (type == ENTRY_SYMBOL);
-    symtab->symbols[symtab->count].is_extern = (type == EXTERNAL_SYMBOL);
-    symtab->count++;
+    store_symbol(symtab, name, value, type);
     
     return TRUE;
 }
@@ -175,32 +186,24 @@ int has_externs(const SymbolTable *symtab) {
     return FALSE;
 }
 
-int is_valid_label(const char *label) {
-    char name_only[MAX_LABEL_NAME_LENGTH];
-    size_t len;
-    
+int is_valid_label(char *label) {
+    char temp[MAX_LABEL_NAME_LENGTH];
+
     if (!is_valid_syntax(label))
         return FALSE;
+
+    strncpy(temp, label, MAX_LABEL_NAME_LENGTH);
+    temp[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
     
-    /* Extract name portion (without colon) */
-    len = strlen(label);
-    strncpy(name_only, label, len-1);
-    name_only[len-1] = NULL_TERMINATOR;
-    
-    if (is_reserved_word(name_only))
+    extract_label_name(temp);
+
+    if (is_reserved_word(temp))
         return FALSE;
-    
+
     return TRUE;
 }
 
 int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
-    char *colon_pos;
-    
-    if (!is_valid_label(label))
-        return FALSE;
-    
-    colon_pos = strchr(label, LABEL_TERMINATOR);
-    *colon_pos = NULL_TERMINATOR;
-    
+    extract_label_name(label);
     return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
 }

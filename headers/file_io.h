@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "symbol_table.h"
+#include "macro_table.h"
 
 /* Various file extensions */
 #define FILE_EXT_INPUT ".as"
@@ -13,9 +14,7 @@
 
 #define MAX_FILENAME_LENGTH 100
 
-/* First pass result codes */
-#define PASS_SUCCESS 0
-#define PASS_ERROR -1
+#define PASS_ERROR -1 /* Pass result code */
 
 /* Function prototypes */
 
@@ -30,12 +29,12 @@ FILE *open_source_file(const char *filename);
 
 FILE *open_output_file(const char *filename);
 
-int preprocess_macros(const char* src_filename, const char* am_filename);
+int preprocess_macros(const char* src_filename, const char* am_filename, MacroTable *macro_table);
 
-int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);
+int first_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *memory);
 
 int second_pass(
-    const char *filename, SymbolTable *symtab, MemoryImage *memory,
+    const char *filename, SymbolTable *symbol_table, MemoryImage *memory,
     const char *obj_file, const char *ent_file, const char *ext_file
 );
 

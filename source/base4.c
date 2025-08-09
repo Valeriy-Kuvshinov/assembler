@@ -2,7 +2,7 @@
 #include "memory.h"
 #include "base4.h"
 
-static const char digits[BASE4_ENCODING + 1] = {'a','b','c','d',NULL_TERMINATOR}; /* a=0, b=1, c=2, d=3 */
+static const char base4_digits[BASE4_ENCODING + 1] = {'a','b','c','d',NULL_TERMINATOR}; /* a=0, b=1, c=2, d=3 */
 
 /* Inner STATIC methods */
 /* ==================================================================== */
@@ -22,13 +22,13 @@ void convert_to_base4_header(int value, char *result) {
     int i = 0;
 
     if (value == 0) {
-        result[0] = digits[0];
+        result[0] = base4_digits[0];
         result[1] = NULL_TERMINATOR;
         return;
     }
 
     while (value > 0) {
-        result[i++] = digits[value % BASE4_ENCODING];
+        result[i++] = base4_digits[value % BASE4_ENCODING];
         value /= BASE4_ENCODING;
     }
     result[i] = NULL_TERMINATOR;
@@ -39,7 +39,7 @@ void convert_to_base4_address(int value, char *result) {
     int i;
 
     for (i = ADDR_LENGTH - 2; i >= 0; i--) {
-        result[i] = digits[value % BASE4_ENCODING];
+        result[i] = base4_digits[value % BASE4_ENCODING];
         value /= BASE4_ENCODING;
     }
     result[ADDR_LENGTH - 1] = NULL_TERMINATOR;
@@ -49,7 +49,7 @@ void convert_to_base4_word(int value, char *result) {
     int i;
 
     for (i = WORD_LENGTH - 2; i >= 0; i--) {
-        result[i] = digits[value % BASE4_ENCODING];
+        result[i] = base4_digits[value % BASE4_ENCODING];
         value /= BASE4_ENCODING;
     }
     result[WORD_LENGTH - 1] = NULL_TERMINATOR;

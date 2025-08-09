@@ -5,7 +5,6 @@
 
 #include "utils.h"
 #include "errors.h"
-#include "instructions.h"
 #include "macro_table.h"
 #include "file_io.h"
 
@@ -38,7 +37,7 @@ static char *extract_macro_name_from_call(const char *line) {
 }
 
 static int parse_macro_declaration(char *line, char **name, int line_num) {
-    *name = strtok(line + strlen(MACRO_START), " \t");
+    *name = strtok(line + strlen(MACRO_START), SPACE_TAB);
 
     if (!*name) {
         fprintf(stderr, "Missing name after 'mcro' declaration, line %d \n", line_num);
@@ -58,11 +57,10 @@ static int process_macro_definition(char *line, MacroTable *macro_table, Macro *
         return FALSE;
     }
 
-    if (!store_macro(macro_table, name)) {
-        fprintf(stderr, "Duplicate macro '%s', line %d \n", name, line_num);
+    if (!add_macro(macro_table, name)) {
+        fprintf(stderr, "Duplicate macro, line %d \n", line_num);
         return FALSE;
     }
-    
     *in_macro_definition = 1;
     *current_macro = &macro_table->macros[macro_table->count - 1];
 
@@ -78,9 +76,8 @@ static void process_macro_body(const char *original_line, Macro *current_macro, 
 
     /* Add line to macro body (including empty lines) */
     if (current_macro->line_count < MAX_MACRO_BODY) {
-        /* Enforce 80 character limit */
-        if (strlen(clean_line) > 80) {
-            clean_line[80] = NULL_TERMINATOR;
+        if (strlen(clean_line) > MAX_LINE_LENGTH - 1) {
+            clean_line[MAX_LINE_LENGTH - 1] = NULL_TERMINATOR;
             fprintf(stderr, "Warning: Line truncated to 80 chars in macro '%s', line %d \n", 
                     current_macro->name, line_num);
         }
@@ -90,7 +87,7 @@ static void process_macro_body(const char *original_line, Macro *current_macro, 
         fprintf(stderr, "Macro '%s' body exceeded max size, line %d \n", current_macro->name, line_num);
 }
 
-static int scan_and_store_macros(FILE *src, MacroTable *macro_table) {
+static int scan_for_macros(FILE *src, MacroTable *macro_table) {
     char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
     int in_macro_definition = 0, line_num = 0, error = 0;
     Macro *current_macro = NULL;
@@ -203,36 +200,35 @@ static int write_expanded_output(FILE *src, FILE *am, const MacroTable *macro_ta
 
 /* Outer regular methods */
 /* ==================================================================== */
-int preprocess_macros(const char *src_filename, const char *am_filename) {
-    FILE *src, *am;
-    MacroTable macro_table = {0};  /* initialize table */ 
+int preprocess_macros(const char *filename, const char *am_filename, MacroTable *macro_table) {
+    FILE *fp = NULL, *am = NULL;
 
-    src = open_source_file(src_filename);
+    fp = open_source_file(filename);
 
-    if (!src)
-        return FALSE;
-
-    /* First pass: collect macro definitions */
-    if (!scan_and_store_macros(src, &macro_table)) {
-        safe_fclose(&src);
-        return FALSE;
+    if (!fp) {
+        safe_fclose(&fp);
+        return PASS_ERROR;
     }
-    rewind(src);
+
+    if (!scan_for_macros(fp, macro_table)) {
+        safe_fclose(&fp);
+        return PASS_ERROR;
+    }
+    rewind(fp);
 
     am = open_output_file(am_filename);
 
     if (!am) {
-        safe_fclose(&src);
-        return FALSE;
+        safe_fclose(&fp);
+        return PASS_ERROR;
     }
 
-    /* Second pass: expand macros */
-    if (!write_expanded_output(src, am, &macro_table)) {
-        safe_fclose(&src);
+    if (!write_expanded_output(fp, am, macro_table)) {
+        safe_fclose(&fp);
         safe_fclose(&am);
-        return FALSE;
+        return PASS_ERROR;
     }
-    safe_fclose(&src);
+    safe_fclose(&fp);
     safe_fclose(&am);
 
     return TRUE;

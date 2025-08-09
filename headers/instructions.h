@@ -19,11 +19,6 @@
 #define DEST_SHIFT     2
 #define ARE_SHIFT      0
 
-#define OPCODE_BITS    4
-#define SRC_ADDR_BITS  2
-#define DEST_ADDR_BITS 2
-#define ARE_BITS       2
-
 #define MAX_INSTRUCTION_WORDS 5 /* maximum amount an instruction can require in memory. */
 
 /* Addressing Mode Numeric IDs */
@@ -41,7 +36,7 @@
 typedef struct {
     /* Index of each instruction is the opcode */
     const char *name;
-    int num_operands; /* TWO_OPERANDS, ONE_OPERAND, or NO_OPERANDS */
+    int num_operands;           /* TWO_OPERANDS / ONE_OPERAND / NO_OPERANDS */
     int legal_src_addr_modes;   /* bitmask */
     int legal_dest_addr_modes;  /* bitmask */
 } Instruction;
@@ -52,7 +47,11 @@ int get_instruction_opcode(const char *name);
 
 const Instruction* get_instruction(const char *name);
 
-int calc_instruction_length(const Instruction *inst, char **operands, int operand_count);
+int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count);
+
+int get_operand_addressing_mode(const char *operand);
+
+int validate_instruction_operands_addressing_modes(const Instruction *inst, char **operands, int operand_count);
 
 /* Validation macros */
 
