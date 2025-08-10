@@ -16,8 +16,6 @@ static char *extract_macro_name_from_call(const char *line) {
     char *colon_pos;
 
     strcpy(temp, line);
-    trim_whitespace(temp);
-
     colon_pos = strchr(temp, LABEL_TERMINATOR);
 
     if (colon_pos) {
@@ -71,8 +69,7 @@ static void process_macro_body(const char *original_line, Macro *current_macro, 
     char clean_line[MAX_LINE_LENGTH];
     
     strcpy(clean_line, original_line);
-    remove_comments(clean_line);
-    trim_whitespace(clean_line);
+    preprocess_line(clean_line);
 
     /* Add line to macro body (including empty lines) */
     if (current_macro->line_count < MAX_MACRO_BODY) {
@@ -94,9 +91,9 @@ static int scan_for_macros(FILE *src, MacroTable *macro_table) {
 
     while (fgets(line, MAX_LINE_LENGTH, src)) {
         line_num++;
+
         strcpy(original_line, line);
         strcpy(processed_line, line);
-        
         preprocess_line(processed_line);
         
         if (strlen(processed_line) == 0)

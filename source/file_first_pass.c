@@ -25,8 +25,8 @@ static int validate_operand_count(const Instruction *inst, int operand_count, co
 
 static int process_instruction_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory) {
     int instruction_index, operand_start, operand_count, inst_length;
-    const Instruction *inst;
     int has_label = has_label_in_tokens(tokens, token_count);
+    const Instruction *inst;
     
     if (has_label) {
         if (!process_label(tokens[0], symbol_table, INSTRUCTION_START + memory->ic, FALSE))
@@ -36,7 +36,7 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     } else
         instruction_index = 0;
     
-    /* validate instruction */
+    /* Validate instruction */
     inst = get_instruction(tokens[instruction_index]);
 
     if (!inst) {
@@ -52,6 +52,10 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
         return FALSE;
     
     inst_length = calculate_instruction_length(inst, tokens + operand_start, operand_count);
+
+    if (inst_length == -1 || !validate_ic_limit(memory->ic + inst_length))
+        return FALSE;
+
     memory->ic += inst_length;
     
     return TRUE;

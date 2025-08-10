@@ -9,7 +9,7 @@
 #define MAX_DC_SIZE   100          /* Available data words DC (0-99) */
 #define MAX_IC_SIZE   156          /* Available instruction words IC (100-255) */
 
-#define WORD_MASK 0x3FF            /* Mask to enforce 10-bit word size */
+#define WORD_MASK 0x3FF            /* Mask to enforce 10-bit word size (bits 0-9 set to 1) */
 
 #define REGISTER_CHAR 'r'          /* r0-r7 */
 #define PSW_REGISTER "PSW"         /* Program Status Word register */
@@ -19,18 +19,52 @@
 #define ADDR_LENGTH 5              /* 4 + null terminator */
 #define WORD_LENGTH 6              /* 5 + null terminator */
 
-/* Memory word representation */
+/* A/R/E Field Values */
+#define ARE_ABSOLUTE 0             /* 00 in binary */
+#define ARE_EXTERNAL 1             /* 01 in binary */ 
+#define ARE_RELOCATABLE 2          /* 10 in binary */
+
+/* First instruction word format */
 typedef struct {
-    unsigned int value : 10;       /* 10-bit value */
-    unsigned int are : 2;          /* A/R/E bits */
-    int ext_symbol_index;          /* Index of external symbol in symbol table (-1 if not external) */
+    unsigned int are    : 2;       /* A/R/E bits 0–1 */
+    unsigned int dest   : 2;       /* bits 2–3 */
+    unsigned int src    : 2;       /* bits 4–5 */
+    unsigned int opcode : 4;       /* bits 6–9 */
+} InstrWord;
+
+/* Operand word: address or immediate value */
+typedef struct {
+    unsigned int are   : 2;        /* A/R/E bits 0–1 */
+    unsigned int value : 8;        /* bits 2–9 */
+    int ext_symbol_index;
+} OperandWord;
+
+/* Register-pair operand word */
+typedef struct {
+    unsigned int are    : 2;       /* A/R/E bits 0–1 */
+    unsigned int reg_dst: 4;       /* bits 2–5 */
+    unsigned int reg_src: 4;       /* bits 6–9 */
+} RegWord;
+
+/* Data word for .data/.string/.mat */
+typedef struct {
+    signed int value : 10;         /* bits 0–9 */
+} DataWord;
+
+/* Union to store any type of word */
+typedef union {
+    InstrWord   instr;
+    OperandWord operand;
+    RegWord     reg;
+    DataWord    data;
+    unsigned int raw;              /* for direct output to file */
 } MemoryWord;
 
-/* Memory image */
+/* Memory image: flat array of words */
 typedef struct {
-    MemoryWord words[MAX_WORD_COUNT];
-    int ic;                        /* Instruction counter */
-    int dc;                        /* Data counter */
+    MemoryWord words[MAX_WORD_COUNT]; /* addresses 0–255 */
+    int ic;                           /* instruction counter */
+    int dc;                           /* data counter */
 } MemoryImage;
 
 /* Function prototypes */

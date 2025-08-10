@@ -26,20 +26,6 @@ static int resize_macro_table(MacroTable *table) {
     return TRUE;
 }
 
-static int validate_macro_addition(const MacroTable *table, const char *name) {
-    if (!table) {
-        print_error("Macro table not initialized", NULL);
-        return FALSE;
-    }
-
-    if (find_macro(table, name) != NULL) {
-        print_error("Duplicate macro name", name);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 static int is_valid_syntax(const char *macro) {
     int i;
     
@@ -78,7 +64,7 @@ static int is_reserved_word(const char *macro) {
         return TRUE;
     }
 
-    if (IS_DATA_DIRECTIVE(macro) || IS_LINKER_DIRECTIVE(macro)) {
+    if (IS_DIRECTIVE(macro)) {
         print_error("Macro name cannot be directive (.data / .string / .mat / .entry / .extern)", macro);
         return TRUE;
     }
@@ -102,6 +88,7 @@ static void store_macro(MacroTable *table, const char *name) {
 /* ==================================================================== */
 int init_macro_table(MacroTable *table) {
     table->macros = malloc(INITIAL_MACROS_CAPACITY * sizeof(Macro));
+
     if (!table->macros) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to initialize macro table");
         return FALSE;
@@ -140,8 +127,15 @@ const Macro *find_macro(const MacroTable *table, const char *macro) {
 }
 
 int add_macro(MacroTable *table, const char *name) {
-    if (!validate_macro_addition(table, name))
+    if (!table) {
+        print_error("Macro table not initialized", NULL);
         return FALSE;
+    }
+
+    if (find_macro(table, name) != NULL) {
+        print_error("Duplicate macro name", name);
+        return FALSE;
+    }
 
     if (table->count >= table->capacity) {
         if (!resize_macro_table(table))

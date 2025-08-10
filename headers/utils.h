@@ -24,6 +24,8 @@
 
 #define NULL_TERMINATOR '\0'
 
+#define BASE10_ENCODING 10
+
 /* Function prototypes */
 
 void trim_whitespace(char* str);

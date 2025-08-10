@@ -27,4 +27,7 @@ int process_directive(
 #define IS_LINKER_DIRECTIVE(token) \
     (strcmp((token), ENTRY_DIRECTIVE) == 0 || strcmp((token), EXTERN_DIRECTIVE) == 0)
 
+#define IS_DIRECTIVE(token) \
+    (IS_DATA_DIRECTIVE(token) || IS_LINKER_DIRECTIVE(token))
+
 #endif

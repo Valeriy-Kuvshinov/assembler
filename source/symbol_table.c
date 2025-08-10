@@ -26,29 +26,6 @@ static int resize_symbol_table(SymbolTable *symtab) {
     return TRUE;
 }
 
-static int validate_symbol_addition(const SymbolTable *symtab, const char *symbol, int type) {
-    int i;
-
-    if (!symtab) {
-        print_error("Symbol table not initialized", NULL);
-        return FALSE;
-    }
-
-    /* Check for duplicates and conflicts */
-    for (i = 0; i < symtab->count; i++) {
-        if (strcmp(symtab->symbols[i].name, symbol) == 0) {
-            if ((symtab->symbols[i].type == EXTERNAL_SYMBOL && type == ENTRY_SYMBOL) ||
-                (symtab->symbols[i].type == ENTRY_SYMBOL && type == EXTERNAL_SYMBOL)) {
-                print_error("Label cannot be both .extern and .entry", symbol);
-                return FALSE;
-            }
-            print_error("Label is already defined", symbol);
-            return FALSE;
-        }
-    }
-    return TRUE;
-}
-
 static int is_valid_syntax(const char *label) {
     size_t len;
     int i;
@@ -95,7 +72,7 @@ static int is_reserved_word(const char *label) {
         return TRUE;
     }
     
-    if (IS_DATA_DIRECTIVE(label) || IS_LINKER_DIRECTIVE(label)) {
+    if (IS_DIRECTIVE(label)) {
         print_error("Label cannot be directive (.data / .string / .mat / .entry / .extern)", label);
         return TRUE;
     }
@@ -140,16 +117,46 @@ void free_symbol_table(SymbolTable *symtab) {
     symtab->capacity = 0;
 }
 
-void extract_label_name(char *label) {
+void extract_text_from_label(char *label) {
     char *colon = strchr(label, LABEL_TERMINATOR);
 
     if (colon)
         *colon = NULL_TERMINATOR; /* Remove the colon */
 }
 
+Symbol* find_symbol(SymbolTable *symtab, const char *name) {
+    int i;
+
+    if (!symtab || !symtab->symbols || !name)
+        return NULL;
+
+    for (i = 0; i < symtab->count; i++) {
+        if (strcmp(symtab->symbols[i].name, name) == 0)
+            return &symtab->symbols[i];
+    }
+    return NULL;
+}
+
 int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
-    if (!validate_symbol_addition(symtab, name, type))
+    Symbol *existing_symbol;
+
+    if (!symtab) {
+        print_error("Symbol table not initialized", NULL);
         return FALSE;
+    }
+
+    existing_symbol = find_symbol(symtab, name);
+
+    if (existing_symbol != NULL) {
+        /* A symbol with this name already exists, check for conflicts */
+        if ((existing_symbol->type == EXTERNAL_SYMBOL && type == ENTRY_SYMBOL) ||
+            (existing_symbol->type == ENTRY_SYMBOL && type == EXTERNAL_SYMBOL)) {
+            print_error("Label cannot be both .extern and .entry", name);
+            return FALSE;
+        }
+        print_error("Label is already defined", name);
+        return FALSE;
+    }
     
     if (symtab->count >= symtab->capacity) {
         if (!resize_symbol_table(symtab))
@@ -195,7 +202,7 @@ int is_valid_label(char *label) {
     strncpy(temp, label, MAX_LABEL_NAME_LENGTH);
     temp[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
     
-    extract_label_name(temp);
+    extract_text_from_label(temp);
 
     if (is_reserved_word(temp))
         return FALSE;
@@ -204,6 +211,6 @@ int is_valid_label(char *label) {
 }
 
 int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
-    extract_label_name(label);
+    extract_text_from_label(label);
     return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
 }

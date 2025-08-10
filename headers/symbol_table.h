@@ -31,7 +31,9 @@ int init_symbol_table(SymbolTable *symtab);
 
 void free_symbol_table(SymbolTable *symtab);
 
-void extract_label_name(char *label);
+void extract_text_from_label(char *label);
+
+Symbol* find_symbol(SymbolTable *symtab, const char *name);
 
 int add_symbol(SymbolTable *symtab, const char *name, int value, int type);
 

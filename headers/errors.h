@@ -1,7 +1,7 @@
 #ifndef ERRORS_H
 #define ERRORS_H
 
-/* Multi purpose errors */
+/* Common errors */
 
 /* Memory */
 #define ERR_MEMORY_ALLOCATION       "Memory allocation failed"
@@ -26,10 +26,7 @@
 #define ERR_CONSECUTIVE_COMMAS      "Consecutive commas"
 #define ERR_MISSING_COMMA           "Missing comma between operands"
 
-/* Instruction */
-#define ERR_TOO_MANY_WORDS          "Instruction exceeds 5-word limit"
-
 /* Directive */
-#define ERR_INVALID_MATRIX          "Invalid matrix syntax ([rX][rY])"
+#define ERR_INVALID_MATRIX          "Invalid matrix syntax ([rX][rY]), dimension values must be natural numbers"
 
 #endif

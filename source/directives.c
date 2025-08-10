@@ -15,15 +15,10 @@
 static int validate_number(const char *token, int *value) {
     char *endptr;
     
-    *value = strtol(token, &endptr, 10);
+    *value = strtol(token, &endptr, BASE10_ENCODING);
 
-    if (*endptr != NULL_TERMINATOR) {
-        print_error(".data value must be decimal integer (-512 - 511)", token);
-        return FALSE;
-    }
-    
-    if (*value < -512 || *value > 511) {
-        print_error("Number out of signed decimal integer range (-512 - 511)", token);
+    if ((*endptr != NULL_TERMINATOR) || (*value < -512 || *value > 511)) {
+        print_error(".data value must be a decimal integer within the signed range (-512 to 511)", token);
         return FALSE;
     }
     return TRUE;
@@ -33,7 +28,7 @@ static int validate_string(const char *str) {
     int len = strlen(str);
     
     if (len < 2 || str[0] != QUOTATION_CHAR || str[len-1] != QUOTATION_CHAR) {
-        print_error("String must be in double quotes", str);
+        print_error("String literal must be enclosed in double quotes", str);
         return FALSE;
     }
     return TRUE;
@@ -44,7 +39,7 @@ static int process_data_directive(char **tokens, int token_count, SymbolTable *s
     int start_idx = 0;
 
     if (token_count <= start_idx + 1) {
-        print_error("Invalid data directive", NULL);
+        print_error("Invalid .data directive: need at least one numeric value", NULL);
         return FALSE;
     }
     
@@ -64,7 +59,7 @@ static int process_string_directive(char **tokens, int token_count, SymbolTable 
     int start_idx = 0;
 
     if (token_count != start_idx + 2) {
-        print_error("Invalid string directive", NULL);
+        print_error("Invalid .string directive: need exactly one string literal", NULL);
         return FALSE;
     }
     
@@ -105,7 +100,7 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
     int start_idx = 0;
 
     if (token_count <= start_idx + 2) {
-        print_error("Invalid matrix directive", NULL);
+        print_error("Invalid .mat directive: need dimensions and at least one numeric value", NULL);
         return FALSE;
     }
     
@@ -114,9 +109,8 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
     if (!parse_matrix_dimensions(matrix_def, &rows, &cols))
         return FALSE;
     
-    /* Validate number of values */
     if (token_count != start_idx + 2 + (rows * cols)) {
-        print_error("Matrix dimensions don't match values", NULL);
+        print_error("Matrix dimensions don't match the number of provided values", NULL);
         return FALSE;
     }
     
@@ -132,19 +126,18 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
 }
 
 static int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab) {
-    int i;
+    Symbol *symbol_ptr;
     
     if (token_count != 2) {
-        print_error("Invalid entry directive", NULL);
+        print_error("Invalid .entry directive: need exactly one label", NULL);
         return FALSE;
     }
     
-    /* Find the symbol and mark it as entry */
-    for (i = 0; i < symtab->count; i++) {
-        if (strcmp(symtab->symbols[i].name, tokens[1]) == 0) {
-            symtab->symbols[i].is_entry = TRUE;
-            return TRUE;
-        }
+    symbol_ptr = find_symbol(symtab, tokens[1]);
+
+    if (symbol_ptr) {
+        symbol_ptr->is_entry = TRUE;
+        return TRUE;
     }
     return FALSE;
 }
@@ -153,17 +146,16 @@ static int process_extern_directive(char **tokens, int token_count, SymbolTable 
     int start_idx = 0;
 
     if (token_count != start_idx + 2) {
-        print_error("Invalid extern directive", NULL);
+        print_error("Invalid .extern directive: need exactly one label", NULL);
         return FALSE;
     }
-    
     return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
 }
 
 /* Outer regular methods */
 /* ==================================================================== */
 int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass) {
-    if (token_count < 1) 
+    if (token_count < 1)
         return FALSE;
     
     if (strcmp(tokens[0], DATA_DIRECTIVE) == 0) {

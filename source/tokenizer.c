@@ -8,7 +8,6 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-/* New helper function to resize the array of token pointers */
 static int resize_tokens_array(ParseState *state) {
     int new_capacity = state->tokens_capacity * 2;
     char **new_tokens = realloc(state->tokens, (new_capacity + 1) * sizeof(char *));
@@ -119,8 +118,8 @@ static int init_parsing(ParseState *state, int *token_count_ptr) {
     state->current_token_size = INITIAL_TOKEN_SIZE;
     state->tokens_capacity = INITIAL_TOKENS_CAPACITY;
     state->prev_was_comma = 0;
-    state->token_count = token_count_ptr; /* Store pointer to external token_count */
-    *state->token_count = 0; /* Initialize external token_count */
+    state->token_count = token_count_ptr;
+    *state->token_count = 0;
 
     state->current_token = malloc(state->current_token_size);
     state->tokens = malloc((state->tokens_capacity + 1) * sizeof(char *)); 
@@ -152,18 +151,15 @@ void free_tokens(char **tokens, int token_count) {
 int parse_tokens(const char *line, char ***tokens_ptr, int *token_count) {
     const char *p = line;
     ParseState state;
+    *tokens_ptr = NULL; 
 
     if (!init_parsing(&state, token_count))
         return FALSE;
 
-    /* Set tokens_ptr to NULL initially, will be updated on success */
-    *tokens_ptr = NULL; 
-
     while (*p) {
         if (!process_character(&state, *p)) {
-            /* Error occurred, clean up all allocated tokens and current_token */
             safe_free((void**)&state.current_token);
-            free_tokens(state.tokens, state.token_index); /* token_index is count of tokens successfully added */
+            free_tokens(state.tokens, state.token_index);
             
             return FALSE;
         }
@@ -179,14 +175,8 @@ int parse_tokens(const char *line, char ***tokens_ptr, int *token_count) {
             return FALSE;
         }
     }
-    /* Free the temporary current_token buffer */
     safe_free((void**)&state.current_token);
-
-    /* Null-terminate the array of token pointers for easy iteration */
-    /* This slot was pre-allocated in init_parsing */
     state.tokens[state.token_index] = NULL; 
-
-    /* Pass the allocated tokens array back to the caller */
     *tokens_ptr = state.tokens;
 
     return TRUE;

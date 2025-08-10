@@ -1,16 +1,16 @@
 #include "memory.h"
 #include "instructions.h"
 
+#include "memory.h"
+#include "errors.h"
+
 void init_memory(MemoryImage *memory) {
     int i;
-
     memory->ic = 0;
     memory->dc = 0;
-    
+
     for (i = 0; i < MAX_WORD_COUNT; i++) {
-        memory->words[i].value = 0;
-        memory->words[i].are = ARE_ABSOLUTE;
-        memory->words[i].ext_symbol_index = -1;
+        memory->words[i].raw = 0; /* clear all bits */
     }
 }
 
@@ -30,12 +30,13 @@ int validate_dc_limit(int current_dc) {
     return TRUE;
 }
 
+/* Store a 10-bit signed value in the data segment */
 int store_value(MemoryImage *memory, int value) {
     if (!validate_dc_limit(memory->dc))
         return FALSE;
-    
-    memory->words[INSTRUCTION_START + memory->ic + memory->dc].value = value & WORD_MASK;
-    memory->words[INSTRUCTION_START + memory->ic + memory->dc].are = ARE_ABSOLUTE;
+
+    /* Store the data word at the current data counter index */
+    memory->words[memory->dc].data.value = value & WORD_MASK;  /* Enforce 10-bit */
     memory->dc++;
 
     return TRUE;
