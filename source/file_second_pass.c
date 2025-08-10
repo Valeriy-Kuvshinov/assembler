@@ -24,8 +24,8 @@ static int encode_immediate_operand(const char *operand, MemoryWord *word) {
         print_error("Invalid immediate value", operand);
         return FALSE;
     }
-    word->operand.value = value & WORD_MASK; /* Access through operand member */
-    word->operand.are = ARE_ABSOLUTE;        /* Access through operand member */
+    word->operand.value = value & WORD_MASK;
+    word->operand.are = ARE_ABSOLUTE;
 
     return TRUE;
 }
@@ -37,8 +37,8 @@ static int encode_register_operand(const char *operand, MemoryWord *word) {
         print_error("invalid register", operand);
         return FALSE;
     }
-    word->operand.value = reg;      /* Access through operand member */
-    word->operand.are = ARE_ABSOLUTE; /* Access through operand member */
+    word->operand.value = reg;
+    word->operand.are = ARE_ABSOLUTE;
 
     return TRUE;
 }
@@ -54,12 +54,11 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symbol_table,
     if (sym->type == EXTERNAL_SYMBOL) {
         word->operand.value = 0; /* External symbols have value 0 in the instruction word */
         word->operand.are = ARE_EXTERNAL;
-        /* Store the index of the external symbol for later .ext file generation */
-        /* This assumes symbol_table->symbols is a contiguous array and sym is a pointer into it */
-        word->operand.ext_symbol_index = (int)(sym - symbol_table->symbols); 
+        word->operand.ext_symbol_index = (int)(sym - symbol_table->symbols);
     } else {
-        word->operand.value = sym->value;
+        word->operand.value = sym->value & WORD_MASK;
         word->operand.are = ARE_RELOCATABLE;
+        word->operand.ext_symbol_index = -1;
     }
     return TRUE;
 }
@@ -112,8 +111,8 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
     if (!extract_bracketed_registers(temp, &reg1_str, &reg2_str))
         return FALSE;
 
-    if (strlen(reg1_str) != 2 || reg1_str[0] != REGISTER_CHAR || !isdigit(reg1_str[1]) ||
-        strlen(reg2_str) != 2 || reg2_str[0] != REGISTER_CHAR || !isdigit(reg2_str[1])) {
+    if (strlen(reg1_str) != REGISTER_LENGTH || reg1_str[0] != REGISTER_CHAR || !isdigit(reg1_str[1]) ||
+        strlen(reg2_str) != REGISTER_LENGTH || reg2_str[0] != REGISTER_CHAR || !isdigit(reg2_str[1])) {
         print_error("Invalid register pair", "Invalid register format in matrix addressing");
         return FALSE;
     }
@@ -170,34 +169,53 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symbol_table,
 }
 
 static int encode_operand(const char *operand, SymbolTable *symbol_table, MemoryWord *word, int is_dest, MemoryWord *next_word) {
-    word->operand.ext_symbol_index = -1; /* Default to no external symbol reference */
+    word->raw = 0;
+    word->operand.ext_symbol_index = -1;
 
-    if (next_word) 
-        next_word->operand.ext_symbol_index = -1; /* Default for second word too */
+    if (next_word) {
+        next_word->raw = 0;
+        next_word->operand.ext_symbol_index = -1;
+    }
     
     /* Immediate value (#num) */
-    if (operand[0] == IMMEDIATE_PREFIX)
-        return encode_immediate_operand(operand, word);
-    
+    if (operand[0] == IMMEDIATE_PREFIX) {
+        if (!encode_immediate_operand(operand, word)) 
+            return FALSE;
+    }
     /* Register (r0-r7) */
-    /* Check for exactly 3 characters: 'r', digit, null terminator */
-    if (strlen(operand) == 2 && operand[0] == REGISTER_CHAR && isdigit(operand[1]))
-        return encode_register_operand(operand, word);
-    
+    else if (strlen(operand) == REGISTER_LENGTH && operand[0] == REGISTER_CHAR && isdigit(operand[1])) {
+        if (!encode_register_operand(operand, word)) 
+            return FALSE;
+    }
     /* Matrix access (label[rX][rY]) */
-    if (strchr(operand, LEFT_BRACKET))
-        return encode_matrix_operand(operand, symbol_table, word, next_word);
-    
+    else if (strchr(operand, LEFT_BRACKET)) {
+        if (!encode_matrix_operand(operand, symbol_table, word, next_word)) 
+            return FALSE;
+    }
     /* Symbol/label (direct addressing) */
-    return encode_symbol_operand(operand, symbol_table, word);
+    else if (!encode_symbol_operand(operand, symbol_table, word)) 
+        return FALSE;
+
+    printf("DEBUG encode_operand: operand=\"%s\" word->raw=0x%03X\n", operand, word->raw & WORD_MASK);
+    if (next_word)
+        printf("DEBUG encode_operand: operand=\"%s\" next_word->raw=0x%03X\n", operand, next_word->raw & WORD_MASK);
+
+    return TRUE;
 }
 
 static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWord operand_word) {
+    int addr_index;
+
     if (!validate_ic_limit(*current_ic_ptr + 1))
         return FALSE;
     
     /* Store the word at the calculated instruction address */
-    memory->words[INSTRUCTION_START + (*current_ic_ptr)++] = operand_word;
+    addr_index = INSTRUCTION_START + (*current_ic_ptr);
+    memory->words[addr_index] = operand_word;
+    (*current_ic_ptr)++;
+
+    printf("DEBUG store_operand_word: stored at %d (base addr %d) value=0x%03X\n",
+           addr_index, addr_index, memory->words[addr_index].raw & WORD_MASK);
 
     return TRUE;
 }
@@ -209,17 +227,14 @@ static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg
         return FALSE;
     
     target_word = &memory->words[INSTRUCTION_START + (*current_ic_ptr)];
-    target_word->raw = 0; /* Clear bits */
+    target_word->raw = 0;
     
-    /* Assign register value to the appropriate field in RegWord */
-    if (shift == 6) { /* Source register */
+    if (shift == 6) /* Source register */
         target_word->reg.reg_src = reg_value;
-    } else if (shift == 2) { /* Destination register */
+    else if (shift == 2)/* Destination register */
         target_word->reg.reg_dst = reg_value;
-    }
-    target_word->reg.are = ARE_ABSOLUTE;
-    /* ext_symbol_index is not part of RegWord, so do not access it here */
     
+    target_word->reg.are = ARE_ABSOLUTE;
     (*current_ic_ptr)++;
 
     return TRUE;
@@ -232,14 +247,12 @@ static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryW
         return FALSE;
     
     target_word = &memory->words[INSTRUCTION_START + (*current_ic_ptr)];
-    target_word->raw = 0; /* Clear bits */
+    target_word->raw = 0;
     
     /* Combine source and destination register values into a single RegWord */
-    target_word->reg.reg_src = src_word.operand.value; /* Access value from operand member */
-    target_word->reg.reg_dst = dest_word.operand.value; /* Access value from operand member */
-    target_word->reg.are = ARE_ABSOLUTE;
-    /* ext_symbol_index is not part of RegWord, so do not access it here */
-    
+    target_word->reg.reg_src = src_word.operand.value;
+    target_word->reg.reg_dst = dest_word.operand.value;
+    target_word->reg.are = ARE_ABSOLUTE;    
     (*current_ic_ptr)++;
 
     return TRUE;
@@ -247,8 +260,7 @@ static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryW
 
 static int process_operand_storage(MemoryImage *memory, int *current_ic_ptr, int mode, MemoryWord operand_word, MemoryWord next_word, int reg_shift) {
     if (mode == ADDR_MODE_REGISTER)
-        /* If it's a single register operand that needs its own word (not part of two-register optimization) */
-        return store_register_word(memory, current_ic_ptr, operand_word.operand.value, reg_shift); /* Access value from operand member */
+        return store_register_word(memory, current_ic_ptr, operand_word.operand.value, reg_shift);
     else {
         /* Store the primary operand word (immediate, direct, or matrix label) */
         if (!store_operand_word(memory, current_ic_ptr, operand_word))
@@ -261,48 +273,74 @@ static int process_operand_storage(MemoryImage *memory, int *current_ic_ptr, int
     return TRUE;
 }
 
-static int encode_instruction_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, 
-                                     SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
-    MemoryWord src_operand_word, src_next_operand_word; /* For source operand and its potential second word (matrix) */
-    MemoryWord dest_operand_word, dest_next_operand_word; /* For destination operand and its potential second word (matrix) */
-    int src_mode, dest_mode;
+static int handle_single_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
+    int src_mode;
+    MemoryWord operand_word, next_operand_word; 
+    operand_word.raw = 0;
+    next_operand_word.raw = 0;
+
+    /* Encode the single operand (which is always the destination) */
+    if (!encode_operand(operands[operand_start], symbol_table, &operand_word, FALSE, &next_operand_word))
+        return FALSE;
     
+    src_mode = get_operand_addressing_mode(operands[operand_start]);
+
+    instruction_word->instr.dest = src_mode;
+    instruction_word->instr.src = 0;
+
+    printf("DEBUG handle_single_operand: instr at IC=%d instruction_word->raw=0x%03X\n",
+           *current_ic_ptr - 1, instruction_word->raw & WORD_MASK);
+    printf("DEBUG handle_single_operand: operand_word.raw=0x%03X next_word.raw=0x%03X\n",
+           operand_word.raw & WORD_MASK, next_operand_word.raw & WORD_MASK);
+
+    return process_operand_storage(memory, current_ic_ptr, src_mode, operand_word, next_operand_word, 2);
+}
+
+static int handle_two_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
+    int src_mode, dest_mode;
+    MemoryWord src_operand_word, src_next_operand_word, dest_operand_word, dest_next_operand_word; 
+    src_operand_word.raw = 0;
+    src_next_operand_word.raw = 0;
+    dest_operand_word.raw = 0;
+    dest_next_operand_word.raw = 0;
+
+    /* Encode source operand */
+    if (!encode_operand(operands[operand_start], symbol_table, &src_operand_word, FALSE, &src_next_operand_word))
+        return FALSE;
+    
+    src_mode = get_operand_addressing_mode(operands[operand_start]);
+    instruction_word->instr.src = src_mode; /* Set source addressing mode in instruction word */
+
+    /* Encode destination operand */
+    if (!encode_operand(operands[operand_start + 1], symbol_table, &dest_operand_word, TRUE, &dest_next_operand_word))
+        return FALSE;
+    
+    dest_mode = get_operand_addressing_mode(operands[operand_start + 1]);
+    instruction_word->instr.dest = dest_mode; /* Set destination addressing mode in instruction word */
+
+    /* Two-register optimization: if both source and destination are registers, they share one word */
+    if (src_mode == ADDR_MODE_REGISTER && dest_mode == ADDR_MODE_REGISTER)
+        return store_two_registers(memory, current_ic_ptr, src_operand_word, dest_operand_word);
+    else {
+        /* Store source operand (if not part of two-register optimization) */
+        if (!process_operand_storage(memory, current_ic_ptr, src_mode, src_operand_word, src_next_operand_word, 6))
+            return FALSE;
+        
+        /* Store destination operand */
+        return process_operand_storage(memory, current_ic_ptr, dest_mode, dest_operand_word, dest_next_operand_word, 2);
+    }
+}
+
+static int encode_instruction_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     if (inst->num_operands == NO_OPERANDS) 
         return TRUE;
     
-    if (inst->num_operands >= ONE_OPERAND) {
-        /* Encode source operand (if two operands) or the single operand (if one operand) */
-        if (!encode_operand(operands[operand_start], symbol_table, &src_operand_word, FALSE, &src_next_operand_word))
-            return FALSE;
-        
-        src_mode = get_operand_addressing_mode(operands[operand_start]);
-        instruction_word->instr.src = src_mode; /* Set source addressing mode in instruction word */
-    }
-    
-    if (inst->num_operands == TWO_OPERANDS) {
-        /* Encode destination operand */
-        if (!encode_operand(operands[operand_start + 1], symbol_table, &dest_operand_word, TRUE, &dest_next_operand_word))
-            return FALSE;
-        
-        dest_mode = get_operand_addressing_mode(operands[operand_start + 1]);
-        instruction_word->instr.dest = dest_mode; /* Set destination addressing mode in instruction word */
+    if (inst->num_operands == ONE_OPERAND)
+        return handle_single_operand_encoding(inst, operands, operand_start, symbol_table, memory, current_ic_ptr, instruction_word);
+    else if (inst->num_operands == TWO_OPERANDS)
+        return handle_two_operand_encoding(inst, operands, operand_start, symbol_table, memory, current_ic_ptr, instruction_word);
 
-        /* Two-register optimization: if both source and destination are registers, they share one word */
-        if (src_mode == ADDR_MODE_REGISTER && dest_mode == ADDR_MODE_REGISTER)
-            return store_two_registers(memory, current_ic_ptr, src_operand_word, dest_operand_word);
-        else {
-            /* Store source operand (if not part of two-register optimization) */
-            if (!process_operand_storage(memory, current_ic_ptr, src_mode, src_operand_word, src_next_operand_word, 6))
-                return FALSE;
-            
-            /* Store destination operand */
-            return process_operand_storage(memory, current_ic_ptr, dest_mode, dest_operand_word, dest_next_operand_word, 2);
-        }
-    } else { /* Single operand instruction */
-        instruction_word->instr.dest = src_mode; /* Set destination addressing mode in instruction word */
-        return process_operand_storage(memory, current_ic_ptr, src_mode, src_operand_word, src_next_operand_word, 2);
-    }
-    return TRUE;
+    return FALSE;
 }
 
 static int encode_instruction_word(const Instruction *inst, MemoryImage *memory, int *current_ic_ptr, MemoryWord **current_word_ptr) {
@@ -343,7 +381,7 @@ static int parse_instruction_operands(char **tokens, int token_count, int *opera
 
 static int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr) {
     int operand_start_idx, operand_count;
-    MemoryWord *instruction_word; /* Pointer to the first word of the instruction */
+    MemoryWord *instruction_word;
     
     /* Parse operands to get their starting index and count */
     if (!parse_instruction_operands(tokens, token_count, &operand_start_idx, &operand_count))
@@ -371,7 +409,6 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     else
         instruction_name_idx = 0;
     
-    /* Get the Instruction struct for the given instruction name */
     inst = get_instruction(tokens[instruction_name_idx]);
 
     if (!inst) {
@@ -424,7 +461,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
     char line[MAX_LINE_LENGTH];
     char **tokens = NULL;
     int token_count = 0, line_num = 0, error_flag = 0;
-    int second_pass_ic = 0; /* Local instruction counter for second pass encoding */
+    int second_pass_ic = 0;
 
     while (fgets(line, sizeof(line), fp)) {
         line_num++;
@@ -436,25 +473,21 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
             continue;
         }
 
-        /* Skip empty lines after tokenization */
         if (token_count == 0) {
             free_tokens(tokens, token_count);
             continue;
         }
 
-        /* Process the line (directive or instruction) */
         if (!process_line(tokens, token_count, symbol_table, memory, &second_pass_ic, line_num))
             error_flag = 1;
 
         free_tokens(tokens, token_count);
     }
-    /* At the end of the second pass, second_pass_ic should match memory->ic (from first pass) */
-    /* This is a good sanity check, but not strictly necessary for correctness if first pass is solid. */
     return error_flag ? FALSE : TRUE;
 }
 
 static void write_object_file(const char *filename, MemoryImage *memory) {
-    char ic_str[10], dc_str[10];
+    char ic_str[5], dc_str[5];
     char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
     int i;
     FILE *fp = open_output_file(filename);
@@ -471,15 +504,15 @@ static void write_object_file(const char *filename, MemoryImage *memory) {
     for (i = 0; i < memory->ic; i++) {
         int current_address = INSTRUCTION_START + i;
         convert_to_base4_address(current_address, addr_str);
-        convert_to_base4_word(memory->words[current_address].raw, value_str); /* Use .raw for generic word output */
+        convert_to_base4_word(memory->words[current_address].raw, value_str);
         fprintf(fp, "%s %s\n", addr_str, value_str);
     }
     
     /* Write data */
     for (i = 0; i < memory->dc; i++) {
-        int current_address = INSTRUCTION_START + memory->ic + i; /* Final address for this data word */
+        int current_address = INSTRUCTION_START + memory->ic + i;
         convert_to_base4_address(current_address, addr_str);
-        convert_to_base4_word(memory->words[i].raw, value_str); /* Data words are stored from index 0, use .raw */
+        convert_to_base4_word(memory->words[i].raw, value_str);
         fprintf(fp, "%s %s\n", addr_str, value_str);
     }
     safe_fclose(&fp);
@@ -514,16 +547,15 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
         /* Check if the word at this instruction address is an external reference */
         if (memory->words[j].operand.are == ARE_EXTERNAL && memory->words[j].operand.ext_symbol_index >= 0) {
             convert_to_base4_address(j, addr_str);
-            fprintf(fp, "%s %s\n", 
-                    symbol_table->symbols[memory->words[j].operand.ext_symbol_index].name, 
-                    addr_str);
+            fprintf(fp, "%s %s\n", symbol_table->symbols[memory->words[j].operand.ext_symbol_index].name, addr_str);
         }
     }
     safe_fclose(&fp);
 }
 
 static void write_output_files(MemoryImage *memory, SymbolTable *symbol_table, const char *obj_file, const char *ent_file, const char *ext_file) {
-    int i, external_ref_count = 0;
+    int i;
+    int external_ref_count = 0;
     
     write_object_file(obj_file, memory);
 
@@ -533,13 +565,9 @@ static void write_output_files(MemoryImage *memory, SymbolTable *symbol_table, c
     if (has_externs(symbol_table)) {
         /* Count external references */
         for (i = INSTRUCTION_START; i < INSTRUCTION_START + memory->ic; i++) {
-            if (memory->words[i].operand.are == ARE_EXTERNAL) { /* Check operand.are for external references */
-                printf("DEBUG: Found external reference at address %d\n", i);
+            if (memory->words[i].operand.are == ARE_EXTERNAL)
                 external_ref_count++;
-            }
-        }
-        printf("DEBUG: Total external references found: %d\n", external_ref_count);
-        
+        }        
         if (external_ref_count > 0)
             write_extern_file(ext_file, memory, symbol_table);
     }
@@ -549,7 +577,7 @@ static void write_output_files(MemoryImage *memory, SymbolTable *symbol_table, c
 /* ==================================================================== */
 int second_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *memory, const char *obj_file, const char *ent_file, const char *ext_file) {
     FILE *fp = open_source_file(filename);
-    
+
     if (!fp) {
         safe_fclose(&fp);
         return PASS_ERROR;

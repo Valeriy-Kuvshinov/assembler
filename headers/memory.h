@@ -15,6 +15,7 @@
 #define PSW_REGISTER "PSW"         /* Program Status Word register */
 #define MIN_REGISTER '0'           /* Min register index */
 #define MAX_REGISTER '7'           /* Max register index */
+#define REGISTER_LENGTH 2          
 
 #define ADDR_LENGTH 5              /* 4 + null terminator */
 #define WORD_LENGTH 6              /* 5 + null terminator */

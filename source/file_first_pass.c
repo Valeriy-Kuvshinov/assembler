@@ -36,7 +36,6 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     } else
         instruction_index = 0;
     
-    /* Validate instruction */
     inst = get_instruction(tokens[instruction_index]);
 
     if (!inst) {
@@ -150,7 +149,6 @@ int first_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *mem
     }
     safe_fclose(&fp);
     update_data_symbols(symbol_table, memory->ic);
-    printf("DEBUG: Final IC = %d, DC = %d \n", memory->ic, memory->dc);
 
     return TRUE;
 }

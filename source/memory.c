@@ -1,5 +1,6 @@
-#include "memory.h"
-#include "instructions.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "memory.h"
 #include "errors.h"
@@ -10,7 +11,7 @@ void init_memory(MemoryImage *memory) {
     memory->dc = 0;
 
     for (i = 0; i < MAX_WORD_COUNT; i++) {
-        memory->words[i].raw = 0; /* clear all bits */
+        memset(&memory->words[i], 0, sizeof(MemoryWord));
     }
 }
 
