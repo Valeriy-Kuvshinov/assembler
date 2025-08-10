@@ -4,52 +4,52 @@
 #include "utils.h"
 
 /* Architecture limits */
-#define MAX_WORD_COUNT 256         /* Total addressable memory (0-255) */
-#define INSTRUCTION_START   100    /* First executable address (IC initial value) */
-#define MAX_DC_SIZE   100          /* Available data words DC (0-99) */
-#define MAX_IC_SIZE   156          /* Available instruction words IC (100-255) */
+#define MAX_WORD_COUNT 256            /* Total addressable memory (0-255) */
+#define INSTRUCTION_START   100       /* First executable address (IC initial value) */
+#define MAX_DC_SIZE   100             /* Available data words DC (0-99) */
+#define MAX_IC_SIZE   156             /* Available instruction words IC (100-255) */
 
-#define WORD_MASK 0x3FF            /* Mask to enforce 10-bit word size (bits 0-9 set to 1) */
+#define WORD_MASK 0x3FF               /* Mask to enforce 10-bit word size (bits 0-9 set to 1) */
 
-#define REGISTER_CHAR 'r'          /* r0-r7 */
-#define PSW_REGISTER "PSW"         /* Program Status Word register */
-#define MIN_REGISTER '0'           /* Min register index */
-#define MAX_REGISTER '7'           /* Max register index */
+#define REGISTER_CHAR 'r'             /* r0-r7 */
+#define PSW_REGISTER "PSW"            /* Program Status Word register */
+#define MIN_REGISTER '0'              /* Min register index */
+#define MAX_REGISTER '7'              /* Max register index */
 #define REGISTER_LENGTH 2          
 
-#define ADDR_LENGTH 5              /* 4 + null terminator */
-#define WORD_LENGTH 6              /* 5 + null terminator */
+#define ADDR_LENGTH 5                 /* 4 + null terminator */
+#define WORD_LENGTH 6                 /* 5 + null terminator */
 
 /* A/R/E Field Values */
-#define ARE_ABSOLUTE 0             /* 00 in binary */
-#define ARE_EXTERNAL 1             /* 01 in binary */ 
-#define ARE_RELOCATABLE 2          /* 10 in binary */
+#define ARE_ABSOLUTE 0                /* 00 in binary */
+#define ARE_EXTERNAL 1                /* 01 in binary */ 
+#define ARE_RELOCATABLE 2             /* 10 in binary */
 
 /* First instruction word format */
 typedef struct {
-    unsigned int are    : 2;       /* A/R/E bits 0–1 */
-    unsigned int dest   : 2;       /* bits 2–3 */
-    unsigned int src    : 2;       /* bits 4–5 */
-    unsigned int opcode : 4;       /* bits 6–9 */
+    unsigned int are    : 2;          /* A/R/E bits 0–1 */
+    unsigned int dest   : 2;          /* bits 2–3 */
+    unsigned int src    : 2;          /* bits 4–5 */
+    unsigned int opcode : 4;          /* bits 6–9 */
 } InstrWord;
 
 /* Operand word: address or immediate value */
 typedef struct {
-    unsigned int are   : 2;        /* A/R/E bits 0–1 */
-    unsigned int value : 8;        /* bits 2–9 */
+    unsigned int are   : 2;           /* A/R/E bits 0–1 */
+    unsigned int value : 8;           /* bits 2–9 */
     int ext_symbol_index;
 } OperandWord;
 
 /* Register-pair operand word */
 typedef struct {
-    unsigned int are    : 2;       /* A/R/E bits 0–1 */
-    unsigned int reg_dst: 4;       /* bits 2–5 */
-    unsigned int reg_src: 4;       /* bits 6–9 */
+    unsigned int are    : 2;          /* A/R/E bits 0–1 */
+    unsigned int reg_dst: 4;          /* bits 2–5 */
+    unsigned int reg_src: 4;          /* bits 6–9 */
 } RegWord;
 
 /* Data word for .data/.string/.mat */
 typedef struct {
-    signed int value : 10;         /* bits 0–9 */
+    signed int value : 10;            /* bits 0–9 */
 } DataWord;
 
 /* Union to store any type of word */
@@ -58,7 +58,7 @@ typedef union {
     OperandWord operand;
     RegWord     reg;
     DataWord    data;
-    unsigned int raw;              /* for direct output to file */
+    unsigned int raw;                 /* for direct output to file */
 } MemoryWord;
 
 /* Memory image: flat array of words */

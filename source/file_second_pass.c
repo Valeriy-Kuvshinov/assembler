@@ -52,7 +52,7 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symbol_table,
     }
 
     if (sym->type == EXTERNAL_SYMBOL) {
-        word->operand.value = 0; /* External symbols have value 0 in the instruction word */
+        word->operand.value = 0;
         word->operand.are = ARE_EXTERNAL;
         word->operand.ext_symbol_index = (int)(sym - symbol_table->symbols);
     } else {
@@ -156,12 +156,10 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symbol_table,
 
     printf("DEBUG: matrix: label=%s base_reg=%d index_reg=%d\n", label, base_reg, index_reg);
 
-    /* Encode the register part (second word of matrix operand) */
     next_word->raw = 0; /* Clear bits before setting */
     next_word->reg.reg_src = base_reg; /* Assign to reg_src */
     next_word->reg.reg_dst = index_reg; /* Assign to reg_dst */
     next_word->reg.are = ARE_ABSOLUTE; /* Register word is always absolute */
-    /* ext_symbol_index is not part of RegWord, so do not access it here */
 
     printf("DEBUG: encoded matrix word = %d (0x%X)\n", next_word->raw, next_word->raw); /* Print raw value */
 
@@ -309,7 +307,7 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
         return FALSE;
     
     src_mode = get_operand_addressing_mode(operands[operand_start]);
-    instruction_word->instr.src = src_mode; /* Set source addressing mode in instruction word */
+    instruction_word->instr.src = src_mode;
 
     /* Encode destination operand */
     if (!encode_operand(operands[operand_start + 1], symbol_table, &dest_operand_word, TRUE, &dest_next_operand_word))
@@ -351,9 +349,8 @@ static int encode_instruction_word(const Instruction *inst, MemoryImage *memory,
     
     (*current_word_ptr)->raw = 0; 
     
-    /* Set the opcode and A/R/E bits using the InstrWord struct members. */
     (*current_word_ptr)->instr.opcode = inst->opcode;
-    (*current_word_ptr)->instr.are = ARE_ABSOLUTE; /* Instruction word itself is always absolute */
+    (*current_word_ptr)->instr.are = ARE_ABSOLUTE;
 
     printf("DEBUG: Encoded instruction %s at IC=%d: opcode=%d (0x%x)\n", 
            inst->name, *current_ic_ptr - 1, inst->opcode, (*current_word_ptr)->raw);
@@ -365,7 +362,6 @@ static int parse_instruction_operands(char **tokens, int token_count, int *opera
     int i;
     *operand_start_idx = 0;
     
-    /* Determine if there's a label. If so, operands start after label and instruction name. */
     if (has_label_in_tokens(tokens, token_count))
         *operand_start_idx = 2; /* Skip label and instruction name */
     else
@@ -486,10 +482,32 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
     return error_flag ? FALSE : TRUE;
 }
 
-static void write_object_file(const char *filename, MemoryImage *memory) {
-    char ic_str[5], dc_str[5];
+static void write_instruction_lines(FILE *fp, MemoryImage *memory) {
     char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
     int i;
+
+    for (i = 0; i < memory->ic; i++) {
+        int current_address = INSTRUCTION_START + i;
+        convert_to_base4_address(current_address, addr_str);
+        convert_to_base4_word(memory->words[current_address].raw, value_str);
+        fprintf(fp, "%s %s\n", addr_str, value_str);
+    }
+}
+
+static void write_data_lines(FILE *fp, MemoryImage *memory) {
+    char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
+    int i;
+
+    for (i = 0; i < memory->dc; i++) {
+        int current_address = INSTRUCTION_START + memory->ic + i;
+        convert_to_base4_address(current_address, addr_str);
+        convert_to_base4_word(memory->words[i].raw, value_str);
+        fprintf(fp, "%s %s\n", addr_str, value_str);
+    }
+}
+
+static void write_object_file(const char *filename, MemoryImage *memory) {
+    char ic_str[5], dc_str[5];
     FILE *fp = open_output_file(filename);
     
     if (!fp)
@@ -500,21 +518,9 @@ static void write_object_file(const char *filename, MemoryImage *memory) {
     convert_to_base4_header(memory->dc, dc_str);
     fprintf(fp, "%s %s\n", ic_str, dc_str);
     
-    /* Write instructions */
-    for (i = 0; i < memory->ic; i++) {
-        int current_address = INSTRUCTION_START + i;
-        convert_to_base4_address(current_address, addr_str);
-        convert_to_base4_word(memory->words[current_address].raw, value_str);
-        fprintf(fp, "%s %s\n", addr_str, value_str);
-    }
+    write_instruction_lines(fp, memory);
+    write_data_lines(fp, memory);
     
-    /* Write data */
-    for (i = 0; i < memory->dc; i++) {
-        int current_address = INSTRUCTION_START + memory->ic + i;
-        convert_to_base4_address(current_address, addr_str);
-        convert_to_base4_word(memory->words[i].raw, value_str);
-        fprintf(fp, "%s %s\n", addr_str, value_str);
-    }
     safe_fclose(&fp);
 }
 
@@ -537,40 +543,19 @@ static void write_entry_file(const char *filename, SymbolTable *symbol_table) {
 
 static void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symbol_table) {
     char addr_str[ADDR_LENGTH];
-    int j;
+    int i;
     FILE *fp = open_output_file(filename);
     
     if (!fp)
         return;
     
-    for (j = INSTRUCTION_START; j < INSTRUCTION_START + memory->ic; j++) {
-        /* Check if the word at this instruction address is an external reference */
-        if (memory->words[j].operand.are == ARE_EXTERNAL && memory->words[j].operand.ext_symbol_index >= 0) {
-            convert_to_base4_address(j, addr_str);
-            fprintf(fp, "%s %s\n", symbol_table->symbols[memory->words[j].operand.ext_symbol_index].name, addr_str);
+    for (i = INSTRUCTION_START; i < INSTRUCTION_START + memory->ic; i++) {
+        if (memory->words[i].operand.are == ARE_EXTERNAL && memory->words[i].operand.ext_symbol_index >= 0) {
+            convert_to_base4_address(i, addr_str);
+            fprintf(fp, "%s %s\n", symbol_table->symbols[memory->words[i].operand.ext_symbol_index].name, addr_str);
         }
     }
     safe_fclose(&fp);
-}
-
-static void write_output_files(MemoryImage *memory, SymbolTable *symbol_table, const char *obj_file, const char *ent_file, const char *ext_file) {
-    int i;
-    int external_ref_count = 0;
-    
-    write_object_file(obj_file, memory);
-
-    if (has_entries(symbol_table))
-        write_entry_file(ent_file, symbol_table);
-
-    if (has_externs(symbol_table)) {
-        /* Count external references */
-        for (i = INSTRUCTION_START; i < INSTRUCTION_START + memory->ic; i++) {
-            if (memory->words[i].operand.are == ARE_EXTERNAL)
-                external_ref_count++;
-        }        
-        if (external_ref_count > 0)
-            write_extern_file(ext_file, memory, symbol_table);
-    }
 }
 
 /* Outer regular methods */
@@ -588,7 +573,13 @@ int second_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *me
         return PASS_ERROR;
     }
     safe_fclose(&fp);
-    write_output_files(memory, symbol_table, obj_file, ent_file, ext_file);
+    write_object_file(obj_file, memory);
+
+    if (has_entries(symbol_table))
+        write_entry_file(ent_file, symbol_table);
+
+    if (has_externs(symbol_table))
+        write_extern_file(ext_file, memory, symbol_table);
 
     return TRUE;
 }
