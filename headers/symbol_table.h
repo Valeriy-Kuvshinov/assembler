@@ -3,7 +3,7 @@
 
 #define INITIAL_SYMBOLS_CAPACITY 8
 
-#define MAX_LABEL_NAME_LENGTH 31 /* Max label name length (30 + null terminator) */
+#define MAX_LABEL_NAME_LENGTH 31 /* max label name length (30 + null terminator) */
 
 /* Symbol Types */
 #define CODE_SYMBOL 0
@@ -13,16 +13,16 @@
 
 typedef struct {
     char name[MAX_LABEL_NAME_LENGTH];
-    int value;          /* Address value */
-    int type;           /* CODE_SYMBOL, DATA_SYMBOL, etc. */
-    int is_entry;       /* Boolean flag */
-    int is_extern;      /* Boolean flag */
+    int value;                   /* address value */
+    int type;                    /* CODE_SYMBOL, DATA_SYMBOL, etc. */
+    int is_entry;                /* 'boolean' flag */
+    int is_extern;               /* 'boolean' flag */
 } Symbol;
 
 typedef struct {
-    Symbol *symbols;    /* Dynamic array of symbols */
-    int count;          /* Current number of symbols */
-    int capacity;       /* Current capacity of the array */
+    Symbol *symbols;             /* dynamic array of symbols */
+    unsigned int count;          /* current number of symbols */
+    unsigned int capacity;       /* current capacity of the array */
 } SymbolTable;
 
 /* Function prototypes */

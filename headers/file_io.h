@@ -18,11 +18,6 @@
 
 /* Function prototypes */
 
-void build_files(
-    const char* base_filename, char* input_file, char* am_file,
-    char* obj_file, char* ent_file, char* ext_file
-);
-
 void safe_fclose(FILE **fp);
 
 FILE *open_source_file(const char *filename);
@@ -37,5 +32,11 @@ int second_pass(
     const char *filename, SymbolTable *symbol_table, MemoryImage *memory,
     const char *obj_file, const char *ent_file, const char *ext_file
 );
+
+void write_object_file(const char *filename, MemoryImage *memory);
+
+void write_entry_file(const char *filename, SymbolTable *symbol_table);
+
+void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symbol_table);
 
 #endif

@@ -5,13 +5,6 @@
 
 /* Memory */
 #define ERR_MEMORY_ALLOCATION       "Memory allocation failed"
-#define ERR_CODE_SEGMENT_OVERFLOW \
-    "Program too large! Code segment full (%d/%d words used, max %d allowed)", \
-    (ic - IC_START), MAX_IC_SIZE, MAX_IC_SIZE
-
-#define ERR_DATA_SEGMENT_OVERFLOW \
-    "Data allocation exceeded! Data segment full (%d/%d words used, max %d allowed)", \
-    dc, MAX_DC_SIZE, MAX_DC_SIZE
 
 /* Macro */
 #define ERR_MACRO_SYNTAX            "Macro must start with letter (a-z / A-Z), may contain integers and underscores later, and be ≤30 chars"

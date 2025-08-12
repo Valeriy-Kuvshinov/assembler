@@ -19,10 +19,12 @@
 #define LEFT_BRACKET '['
 #define RIGHT_BRACKET ']'
 #define QUOTATION_CHAR '"'
+#define NEWLINE '\n'
+#define NULL_TERMINATOR '\0'
+
+/* String constants */
 #define SPACE_TAB " \t"
 #define SPACE_TAB_NEWLINE " \t\n"
-
-#define NULL_TERMINATOR '\0'
 
 #define BASE10_ENCODING 10
 
@@ -36,10 +38,10 @@ void preprocess_line(char *line);
 
 int should_skip_line(const char *line);
 
+int has_label_in_tokens(char **tokens, int token_count);
+
 void print_error(const char *message, const char *context);
 
 void safe_free(void **ptr);
-
-char *clone_string(const char *src);
 
 #endif

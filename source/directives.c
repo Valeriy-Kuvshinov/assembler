@@ -25,9 +25,11 @@ static int validate_number(const char *token, int *value) {
 }
 
 static int validate_string(const char *str) {
-    int len = strlen(str);
-    
-    if (len < 2 || str[0] != QUOTATION_CHAR || str[len-1] != QUOTATION_CHAR) {
+    size_t length;
+
+    length = strlen(str);
+
+    if (length < 2 || str[0] != QUOTATION_CHAR || str[length - 1] != QUOTATION_CHAR) {
         print_error("String literal must be enclosed in double quotes", str);
         return FALSE;
     }
@@ -42,11 +44,11 @@ static int process_data_directive(char **tokens, int token_count, SymbolTable *s
         print_error("Invalid .data directive: need at least one numeric value", NULL);
         return FALSE;
     }
-    
+
     for (i = start_idx + 1; i < token_count; i++) {
         if (!validate_number(tokens[i], &value))
             return FALSE;
-        
+
         if (!store_value(memory, value))
             return FALSE;
     }
@@ -55,29 +57,30 @@ static int process_data_directive(char **tokens, int token_count, SymbolTable *s
 
 static int process_string_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *str;
-    int i, len;
+    int i; 
     int start_idx = 0;
+    size_t length;
 
     if (token_count != start_idx + 2) {
         print_error("Invalid .string directive: need exactly one string literal", NULL);
         return FALSE;
     }
-    
+
     str = tokens[start_idx + 1];
 
     if (!validate_string(str))
         return FALSE;
-    
-    len = strlen(str);
-    
-    for (i = 1; i < len - 1; i++) {
+
+    length = strlen(str);
+
+    for (i = 1; i < length - 1; i++) {
         if (!store_value(memory, str[i]))
             return FALSE;
     }
-    
+
     if (!store_value(memory, 0))
         return FALSE;
-    
+
     return TRUE;
 }
 
@@ -103,7 +106,7 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
         print_error("Invalid .mat directive: need dimensions and at least one numeric value", NULL);
         return FALSE;
     }
-    
+
     matrix_def = tokens[start_idx + 1];
 
     if (!parse_matrix_dimensions(matrix_def, &rows, &cols))
@@ -113,12 +116,14 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
         print_error("Matrix dimensions don't match the number of provided values", NULL);
         return FALSE;
     }
-    
+
     /* Store values */
     for (i = 0; i < rows * cols; i++) {
-        if (!validate_number(tokens[start_idx + 2 + i], &value))
+        int token_index = start_idx + 2 + i;
+
+        if (!validate_number(tokens[token_index], &value))
             return FALSE;
-        
+
         if (!store_value(memory, value))
             return FALSE;
     }
@@ -127,12 +132,12 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
 
 static int process_entry_directive(char **tokens, int token_count, SymbolTable *symtab) {
     Symbol *symbol_ptr;
-    
+
     if (token_count != 2) {
         print_error("Invalid .entry directive: need exactly one label", NULL);
         return FALSE;
     }
-    
+
     symbol_ptr = find_symbol(symtab, tokens[1]);
 
     if (symbol_ptr) {
@@ -157,35 +162,35 @@ static int process_extern_directive(char **tokens, int token_count, SymbolTable 
 int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass) {
     if (token_count < 1)
         return FALSE;
-    
+
     if (strcmp(tokens[0], DATA_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* Data already processed in first pass */
 
         return process_data_directive(tokens, token_count, symtab, memory);
     }
-    
+
     else if (strcmp(tokens[0], STRING_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* String already processed in first pass */
 
         return process_string_directive(tokens, token_count, symtab, memory);
     }
-    
+
     else if (strcmp(tokens[0], MATRIX_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* Matrix already processed in first pass */
 
         return process_mat_directive(tokens, token_count, symtab, memory);
     }
-    
+
     else if (strcmp(tokens[0], ENTRY_DIRECTIVE) == 0) {
         if (!is_second_pass) 
             return TRUE; /* Entry handled in second pass */
 
         return process_entry_directive(tokens, token_count, symtab);
     }
-    
+
     else if (strcmp(tokens[0], EXTERN_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* Extern already processed in first pass */

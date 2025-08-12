@@ -1,6 +1,6 @@
 #include "utils.h"
 #include "memory.h"
-#include "base4.h"
+#include "encoder.h"
 
 static const char base4_digits[BASE4_ENCODING + 1] = {'a','b','c','d',NULL_TERMINATOR}; /* a=0, b=1, c=2, d=3 */
 
@@ -24,11 +24,13 @@ void convert_to_base4_header(int value, char *result) {
     if (value == 0) {
         result[0] = base4_digits[0];
         result[1] = NULL_TERMINATOR;
+
         return;
     }
 
     while (value > 0) {
-        result[i++] = base4_digits[value % BASE4_ENCODING];
+        result[i] = base4_digits[value % BASE4_ENCODING];
+        i++;
         value /= BASE4_ENCODING;
     }
     result[i] = NULL_TERMINATOR;

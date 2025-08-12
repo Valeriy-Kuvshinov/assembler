@@ -7,6 +7,7 @@
 
 void init_memory(MemoryImage *memory) {
     int i;
+
     memory->ic = 0;
     memory->dc = 0;
 
@@ -17,7 +18,7 @@ void init_memory(MemoryImage *memory) {
 
 int validate_ic_limit(int current_ic) {
     if (current_ic >= MAX_IC_SIZE) {
-        print_error("Exceeded instruction words limit", NULL);
+        print_error("IC memory overflow", "Exceeded instruction words limit");
         return FALSE;
     }
     return TRUE;
@@ -25,7 +26,7 @@ int validate_ic_limit(int current_ic) {
 
 int validate_dc_limit(int current_dc) {
     if (current_dc >= MAX_DC_SIZE) {
-        print_error("Exceeded data words limit", NULL);
+        print_error("DC memory overflow", "Exceeded data words limit");
         return FALSE;
     }
     return TRUE;

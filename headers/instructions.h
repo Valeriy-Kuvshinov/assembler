@@ -26,8 +26,8 @@ typedef struct {
     const char *name;
     int opcode;
     int num_operands;           /* TWO_OPERANDS / ONE_OPERAND / NO_OPERANDS */
-    int legal_src_addr_modes;   /* For the source operand */
-    int legal_dest_addr_modes;  /* For the destination operand */
+    int legal_src_addr_modes;   /* address mode for source operand */
+    int legal_dest_addr_modes;  /* address mode for destination operand */
 } Instruction;
 
 /* Function prototypes */
@@ -35,10 +35,6 @@ typedef struct {
 const Instruction* get_instruction(const char *name);
 
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count);
-
-int get_operand_addressing_mode(const char *operand);
-
-int validate_instruction_operands_addressing_modes(const Instruction *inst, char **operands, int operand_count);
 
 /* Validation macros */
 

@@ -24,18 +24,19 @@ static int validate_operand_count(const Instruction *inst, int operand_count, co
 }
 
 static int process_instruction_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory) {
-    int instruction_index, operand_start, operand_count, inst_length;
-    int has_label = has_label_in_tokens(tokens, token_count);
+    int instruction_index, operand_start, operand_count, inst_length, has_label;
     const Instruction *inst;
-    
+
+    has_label = has_label_in_tokens(tokens, token_count);
+
     if (has_label) {
-        if (!process_label(tokens[0], symbol_table, INSTRUCTION_START + memory->ic, FALSE))
+        if (!process_label(tokens[0], symbol_table, IC_START + memory->ic, FALSE))
             return FALSE;
 
         instruction_index = 1;
     } else
         instruction_index = 0;
-    
+
     inst = get_instruction(tokens[instruction_index]);
 
     if (!inst) {
@@ -49,20 +50,21 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
 
     if (!validate_operand_count(inst, operand_count, tokens[instruction_index]))
         return FALSE;
-    
+
     inst_length = calculate_instruction_length(inst, tokens + operand_start, operand_count);
 
     if (inst_length == -1 || !validate_ic_limit(memory->ic + inst_length))
         return FALSE;
 
     memory->ic += inst_length;
-    
+
     return TRUE;
 }
 
 static int process_directive_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory) {
-    int directive_index;
-    int has_label = has_label_in_tokens(tokens, token_count);
+    int directive_index, has_label;
+
+    has_label = has_label_in_tokens(tokens, token_count);
     
     if (has_label) {
         if (!process_label(tokens[0], symbol_table, memory->dc, TRUE))
@@ -80,24 +82,24 @@ static void update_data_symbols(SymbolTable *symbol_table, int final_ic) {
     
     for (i = 0; i < symbol_table->count; i++) {
         if (symbol_table->symbols[i].type == DATA_SYMBOL)
-            symbol_table->symbols[i].value += INSTRUCTION_START + final_ic;
+            symbol_table->symbols[i].value += IC_START + final_ic;
     }
 }
 
 static int process_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int line_num) {
     if (!validate_line_format(tokens, token_count)) {
-        fprintf(stderr, "Line %d: Invalid line format \n", line_num);
+        fprintf(stderr, "Line %d: Invalid line format%c", line_num, NEWLINE);
         return FALSE;
     }
 
     if (is_directive_line(tokens, token_count)) {
         if (!process_directive_line(tokens, token_count, symbol_table, memory)) {
-            fprintf(stderr, "Line %d: Directive error \n", line_num);
+            fprintf(stderr, "Line %d: Directive error%c", line_num, NEWLINE);
             return FALSE;
         }
     } else { /* Must be instruction line */
         if (!process_instruction_line(tokens, token_count, symbol_table, memory)) {
-            fprintf(stderr, "Line %d: Instruction error \n", line_num);
+            fprintf(stderr, "Line %d: Instruction error%c", line_num, NEWLINE);
             return FALSE;
         }
     }
@@ -113,7 +115,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
         line_num++;
 
         if (!parse_tokens(line, &tokens, &token_count)) {
-            fprintf(stderr, "Line %d: Syntax error \n", line_num);
+            fprintf(stderr, "Line %d: Syntax error%c", line_num, NEWLINE);
             error_flag = 1;
             continue;
         }

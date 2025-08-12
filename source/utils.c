@@ -10,15 +10,15 @@ void trim_whitespace(char* str) {
     int i;
     int start = 0;
     int end = strlen(str) - 1;
-    
+
     /* Find first non-whitespace */
-    while (isspace(str[start])) 
+    while (isspace(str[start])) {
         start++;
-    
+    }
     /* Find last non-whitespace */
-    while (end >= start && isspace(str[end])) 
+    while (end >= start && isspace(str[end])) {
         end--;
-    
+    }
     /* Shift characters */
     for (i = 0; i <= end - start; i++) {
         str[i] = str[start + i];
@@ -42,11 +42,16 @@ int should_skip_line(const char *line) {
     return (line[0] == NULL_TERMINATOR || line[0] == COMMENT_CHAR);
 }
 
+int has_label_in_tokens(char **tokens, int token_count) {
+    /* Only check first token for label */
+    return (token_count > 0 && strchr(tokens[0], LABEL_TERMINATOR));
+}
+
 void print_error(const char *message, const char *context) {
     if (context)
-        fprintf(stderr, "Error: %s (%s) \n", message, context);
+        fprintf(stderr, "Error: %s (%s)%c", message, context, NEWLINE);
     else
-        fprintf(stderr, "Error: %s \n", message);
+        fprintf(stderr, "Error: %s%c", message, NEWLINE);
 }
 
 void safe_free(void **ptr) {
@@ -54,13 +59,4 @@ void safe_free(void **ptr) {
         free(*ptr);
         *ptr = NULL;
     }
-}
-
-char *clone_string(const char *src) {
-    char *copy = malloc(strlen(src) + 1);
-
-    if (copy)
-        strcpy(copy, src);
-
-    return copy;
 }

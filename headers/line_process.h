@@ -6,8 +6,6 @@
 
 /* Function prototypes */
 
-int has_label_in_tokens(char **tokens, int token_count);
-
 int is_directive_line(char **tokens, int token_count);
 
 int is_instruction_line(char **tokens, int token_count);

@@ -2,9 +2,8 @@
 #define MACRO_TABLE_H
 
 #define INITIAL_MACROS_CAPACITY 8
-
 #define MAX_MACRO_NAME_LENGTH 31  /* 30 chars + null terminator */
-#define MAX_MACRO_BODY 50         /* Max lines per macro */
+#define INITIAL_MACRO_BODY_CAPACITY 8
 
 /* Macro open / close keywords */
 #define MACRO_START "mcro"
@@ -12,14 +11,15 @@
 
 typedef struct {
     char name[MAX_MACRO_NAME_LENGTH];
-    char body[MAX_MACRO_BODY][MAX_LINE_LENGTH];
-    int line_count;
+    char **body;        /* dynamic array of chars of each line */
+    int line_count;     /* current number of lines */
+    int body_capacity;  /* allocated capacity for body lines */
 } Macro;
 
 typedef struct {
-    Macro *macros;   /* dynamic array of macros */
-    int count;       /* number of macros in use */
-    int capacity;    /* total allocated macro slots */
+    Macro *macros;      /* dynamic array of macros */
+    int count;          /* current number of macros */
+    int capacity;       /* total allocated macro slots */
 } MacroTable;
 
 /* Function prototypes */
@@ -33,6 +33,8 @@ int is_valid_macro_start(const char *name);
 const Macro *find_macro(const MacroTable *table, const char *name);
 
 int add_macro(MacroTable *table, const char *name);
+
+int add_line_to_macro(Macro *macro, const char *line_content);
 
 int is_macro_call(const char *line, const MacroTable *table);
 

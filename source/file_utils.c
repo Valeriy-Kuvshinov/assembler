@@ -7,14 +7,6 @@
 #include "errors.h"
 #include "file_io.h"
 
-void build_files(const char* base_filename, char* input_file, char* am_file, char* obj_file, char* ent_file, char* ext_file) {
-    sprintf(input_file, "%s%s", base_filename, FILE_EXT_INPUT);
-    sprintf(am_file, "%s%s", base_filename, FILE_EXT_PREPROC);
-    sprintf(obj_file, "%s%s", base_filename, FILE_EXT_OBJECT);
-    sprintf(ent_file, "%s%s", base_filename, FILE_EXT_ENTRY);
-    sprintf(ext_file, "%s%s", base_filename, FILE_EXT_EXTERN);
-}
-
 void safe_fclose(FILE **fp) {
     if (fp && *fp) {
         fclose(*fp);

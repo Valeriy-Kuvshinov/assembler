@@ -8,6 +8,22 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
+static char *clone_string(const char *src) {
+    char *copy;
+    size_t length;
+
+    if (!src) 
+        return NULL;
+
+    length = strlen(src);
+    copy = malloc(length + 1);
+
+    if (copy)
+        strcpy(copy, src);
+
+    return copy;
+}
+
 static int resize_tokens_array(ParseState *state) {
     int new_capacity = state->tokens_capacity * 2;
     char **new_tokens = realloc(state->tokens, (new_capacity + 1) * sizeof(char *));
@@ -97,7 +113,8 @@ static int handle_character(ParseState *state, char c) {
     if (!state->current_token)
         return FALSE;
 
-    state->current_token[state->char_index++] = c;
+    state->current_token[state->char_index] = c;
+    state->char_index++;
 
     return TRUE;
 }
@@ -126,6 +143,7 @@ static int init_parsing(ParseState *state, int *token_count_ptr) {
 
     if (!state->current_token || !state->tokens) {
         print_error(ERR_MEMORY_ALLOCATION, NULL);
+
         safe_free((void**)&state->current_token);
         safe_free((void**)&state->tokens);
 

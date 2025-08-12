@@ -9,11 +9,6 @@
 #include "symbol_table.h"
 #include "line_process.h"
 
-int has_label_in_tokens(char **tokens, int token_count) {
-    /* Only check first token for label (labels must be first) */
-    return (token_count > 0 && strchr(tokens[0], LABEL_TERMINATOR));
-}
-
 int is_directive_line(char **tokens, int token_count) {
     int i;
     
