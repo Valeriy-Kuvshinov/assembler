@@ -51,19 +51,19 @@ static int process_directive_line(char **tokens, int token_count, SymbolTable *s
 
 static int process_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, int line_num) {
     if (!validate_line_format(tokens, token_count)) {
-        fprintf(stderr, "Line %d: Invalid line format %c", line_num, NEWLINE);
+        print_line_error("Invalid line format", NULL, line_num);
         return FALSE;
     }
 
     /* Check if it's a directive line */
     if (is_directive_line(tokens, token_count)) {
         if (!process_directive_line(tokens, token_count, symbol_table, memory)) {
-            fprintf(stderr, "Line %d: Directive error %c", line_num, NEWLINE);
+            print_line_error("Directive error", NULL, line_num);
             return FALSE;
         }
     } else { /* Must be an instruction line */
         if (!process_instruction_line(tokens, token_count, symbol_table, memory, current_ic_ptr)) {
-            fprintf(stderr, "Line %d: Encoding error %c", line_num, NEWLINE);
+            print_line_error("Encoding error", NULL, line_num);
             return FALSE;
         }
     }
@@ -73,15 +73,14 @@ static int process_line(char **tokens, int token_count, SymbolTable *symbol_tabl
 static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *memory) {
     char line[MAX_LINE_LENGTH];
     char **tokens = NULL;
-    int token_count = 0, line_num = 0, error_flag = 0;
-    int second_pass_ic = 0;
+    int token_count = 0, line_num = 0, error_flag = 0, second_pass_ic = 0;
 
     while (fgets(line, sizeof(line), fp)) {
         line_num++;
 
         /* Parse the line into tokens */
         if (!parse_tokens(line, &tokens, &token_count)) {
-            fprintf(stderr, "Line %d: Syntax error%c", line_num, NEWLINE);
+            print_line_error("Syntax error", NULL, line_num);
             error_flag = 1;
             continue;
         }
@@ -97,6 +96,88 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
         free_tokens(tokens, token_count);
     }
     return error_flag ? FALSE : TRUE;
+}
+
+static void write_instruction_lines(FILE *fp, MemoryImage *memory) {
+    char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
+    int i;
+
+    for (i = 0; i < memory->ic; i++) {
+        int current_address = IC_START + i;
+
+        convert_to_base4_address(current_address, addr_str);
+        convert_to_base4_word(memory->words[current_address].raw, value_str);
+        fprintf(fp, "%s %s%c", addr_str, value_str, NEWLINE);
+    }
+}
+
+static void write_data_lines(FILE *fp, MemoryImage *memory) {
+    char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
+    int i;
+
+    for (i = 0; i < memory->dc; i++) {
+        int current_address = IC_START + memory->ic + i;
+
+        convert_to_base4_address(current_address, addr_str);
+        convert_to_base4_word(memory->words[i].raw, value_str);
+        fprintf(fp, "%s %s%c", addr_str, value_str, NEWLINE);
+    }
+}
+
+static void write_object_file(const char *filename, MemoryImage *memory) {
+    char ic_str[5], dc_str[5];
+    FILE *fp = open_output_file(filename);
+    
+    if (!fp)
+        return;
+    
+    /* Write header */
+    convert_to_base4_header(memory->ic, ic_str);
+    convert_to_base4_header(memory->dc, dc_str);
+    fprintf(fp, "%s %s%c", ic_str, dc_str, NEWLINE);
+    
+    write_instruction_lines(fp, memory);
+    write_data_lines(fp, memory);
+    
+    safe_fclose(&fp);
+}
+
+static void write_entry_file(const char *filename, SymbolTable *symbol_table) {
+    char addr_str[ADDR_LENGTH];
+    int i;
+    FILE *fp = open_output_file(filename);
+    
+    if (!fp)
+        return;
+    
+    for (i = 0; i < symbol_table->count; i++) {
+        if (symbol_table->symbols[i].is_entry) {
+            convert_to_base4_address(symbol_table->symbols[i].value, addr_str);
+            fprintf(fp, "%s %s%c", symbol_table->symbols[i].name, addr_str, NEWLINE);
+        }
+    }
+    safe_fclose(&fp);
+}
+
+static void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symbol_table) {
+    char addr_str[ADDR_LENGTH];
+    int i;
+    FILE *fp = open_output_file(filename);
+    
+    if (!fp)
+        return;
+    
+    for (i = IC_START; i < IC_START + memory->ic; i++) {
+        int ext_index = memory->words[i].operand.ext_symbol_index;
+
+        if (memory->words[i].operand.are == ARE_EXTERNAL && ext_index >= 0) {
+            const char *symbol_name = symbol_table->symbols[ext_index].name;
+
+            convert_to_base4_address(i, addr_str);
+            fprintf(fp, "%s %s%c", symbol_name, addr_str, NEWLINE);
+        }
+    }
+    safe_fclose(&fp);
 }
 
 /* Outer regular methods */

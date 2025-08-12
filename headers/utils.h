@@ -30,6 +30,10 @@
 
 /* Function prototypes */
 
+char *copy_string(const char *src);
+
+int bounded_string_copy(char *dest, const char *src, size_t dest_size, const char *context);
+
 void trim_whitespace(char* str);
 
 void remove_comments(char *line);
@@ -41,6 +45,10 @@ int should_skip_line(const char *line);
 int has_label_in_tokens(char **tokens, int token_count);
 
 void print_error(const char *message, const char *context);
+
+void print_line_error(const char *message, const char *context, int line_num);
+
+void print_line_warning(const char *message, const char *context, int line_num);
 
 void safe_free(void **ptr);
 

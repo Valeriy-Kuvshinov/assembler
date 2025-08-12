@@ -88,13 +88,17 @@ static int is_reserved_word(const char *label) {
 }
 
 static void store_symbol(SymbolTable *symtab, const char *name, int value, int type) {
-    strncpy(symtab->symbols[symtab->count].name, name, MAX_LABEL_NAME_LENGTH - 1);
+    char *dest_name;
+
+    dest_name = symtab->symbols[symtab->count].name;
+    bounded_string_copy(dest_name, name, MAX_LABEL_NAME_LENGTH, "symbol name storage");
 
     symtab->symbols[symtab->count].name[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
     symtab->symbols[symtab->count].value = value;
     symtab->symbols[symtab->count].type = type;
     symtab->symbols[symtab->count].is_entry = (type == ENTRY_SYMBOL);
     symtab->symbols[symtab->count].is_extern = (type == EXTERNAL_SYMBOL);
+
     symtab->count++;
 }
 
@@ -206,9 +210,7 @@ int is_valid_label(char *label) {
     if (!is_valid_syntax(label))
         return FALSE;
 
-    strncpy(temp, label, MAX_LABEL_NAME_LENGTH);
-    temp[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
-
+    bounded_string_copy(temp, label, MAX_LABEL_NAME_LENGTH, "label validation");
     extract_text_from_label(temp);
 
     if (is_reserved_word(temp))

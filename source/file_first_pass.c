@@ -17,7 +17,7 @@
 /* ==================================================================== */
 static int validate_operand_count(const Instruction *inst, int operand_count, const char *inst_name) {
     if (operand_count != inst->num_operands) {
-        fprintf(stderr, "%d / %d", inst->num_operands, operand_count);
+        fprintf(stderr, "Invalid operand amount (%d / %d)", inst->num_operands, operand_count);
         return FALSE;
     }
     return TRUE;
@@ -88,18 +88,18 @@ static void update_data_symbols(SymbolTable *symbol_table, int final_ic) {
 
 static int process_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int line_num) {
     if (!validate_line_format(tokens, token_count)) {
-        fprintf(stderr, "Line %d: Invalid line format%c", line_num, NEWLINE);
+        print_line_error("Invalid line format", NULL, line_num);
         return FALSE;
     }
 
     if (is_directive_line(tokens, token_count)) {
         if (!process_directive_line(tokens, token_count, symbol_table, memory)) {
-            fprintf(stderr, "Line %d: Directive error%c", line_num, NEWLINE);
+            print_line_error("Directive error", NULL, line_num);
             return FALSE;
         }
     } else { /* Must be instruction line */
         if (!process_instruction_line(tokens, token_count, symbol_table, memory)) {
-            fprintf(stderr, "Line %d: Instruction error%c", line_num, NEWLINE);
+            print_line_error("Instruction error", NULL, line_num);
             return FALSE;
         }
     }
@@ -115,7 +115,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
         line_num++;
 
         if (!parse_tokens(line, &tokens, &token_count)) {
-            fprintf(stderr, "Line %d: Syntax error%c", line_num, NEWLINE);
+            print_line_error("Syntax error", NULL, line_num);
             error_flag = 1;
             continue;
         }

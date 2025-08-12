@@ -33,10 +33,4 @@ int second_pass(
     const char *obj_file, const char *ent_file, const char *ext_file
 );
 
-void write_object_file(const char *filename, MemoryImage *memory);
-
-void write_entry_file(const char *filename, SymbolTable *symbol_table);
-
-void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symbol_table);
-
 #endif

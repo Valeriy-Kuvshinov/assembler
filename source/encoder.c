@@ -181,7 +181,7 @@ static int encode_operand(const char *operand, SymbolTable *symbol_table, Memory
         next_word->raw = 0;
         next_word->operand.ext_symbol_index = -1;
     }
-    
+
     /* Immediate value (#num) */
     if (operand[0] == IMMEDIATE_PREFIX) {
         if (!encode_immediate_operand(operand, word)) 
@@ -209,7 +209,7 @@ static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWo
 
     if (!validate_ic_limit(*current_ic_ptr + 1))
         return FALSE;
-    
+
     /* Store the word at the calculated instruction address */
     addr_index = IC_START + (*current_ic_ptr);
     memory->words[addr_index] = operand_word;
@@ -223,15 +223,15 @@ static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg
 
     if (!validate_ic_limit(*current_ic_ptr + 1))
         return FALSE;
-    
+
     target_word = &memory->words[IC_START + (*current_ic_ptr)];
     target_word->raw = 0;
-    
+
     if (shift == 6)
         target_word->reg.reg_src = reg_value; /* Source register */
     else if (shift == 2)
         target_word->reg.reg_dst = reg_value; /* Destination register */
-    
+
     target_word->reg.are = ARE_ABSOLUTE;
     (*current_ic_ptr)++;
 
@@ -243,10 +243,10 @@ static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryW
 
     if (!validate_ic_limit(*current_ic_ptr + 1))
         return FALSE;
-    
+
     target_word = &memory->words[IC_START + (*current_ic_ptr)];
     target_word->raw = 0;
-    
+
     /* Combine source and destination register values into a single RegWord */
     target_word->reg.reg_src = src_word.operand.value;
     target_word->reg.reg_dst = dest_word.operand.value;
@@ -263,7 +263,7 @@ static int process_operand_storage(MemoryImage *memory, int *current_ic_ptr, int
         /* Store the primary operand word (immediate, direct, or matrix label) */
         if (!store_operand_word(memory, current_ic_ptr, operand_word))
             return FALSE;
-        
+
         /* If it's matrix addressing, store the second word (registers) */
         if (mode == ADDR_MODE_MATRIX)
             return store_operand_word(memory, current_ic_ptr, next_word);
@@ -280,7 +280,7 @@ static int handle_one_operand_encoding(const Instruction *inst, char **operands,
     /* Encode the single operand (which is always the destination) */
     if (!encode_operand(operands[operand_start], symbol_table, &operand_word, FALSE, &next_operand_word))
         return FALSE;
-    
+
     src_mode = get_addressing_mode(operands[operand_start]);
 
     instruction_word->instr.dest = src_mode;
@@ -300,14 +300,14 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
     /* Encode source operand */
     if (!encode_operand(operands[operand_start], symbol_table, &src_operand_word, FALSE, &src_next_operand_word))
         return FALSE;
-    
+
     src_mode = get_addressing_mode(operands[operand_start]);
     instruction_word->instr.src = src_mode;
 
     /* Encode destination operand */
     if (!encode_operand(operands[operand_start + 1], symbol_table, &dest_operand_word, TRUE, &dest_next_operand_word))
         return FALSE;
-    
+
     dest_mode = get_addressing_mode(operands[operand_start + 1]);
     instruction_word->instr.dest = dest_mode; /* Set destination addressing mode in instruction word */
 
@@ -318,7 +318,7 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
         /* Store source operand */
         if (!process_operand_storage(memory, current_ic_ptr, src_mode, src_operand_word, src_next_operand_word, 6))
             return FALSE;
-        
+
         /* Store destination operand */
         return process_operand_storage(memory, current_ic_ptr, dest_mode, dest_operand_word, dest_next_operand_word, 2);
     }
@@ -327,7 +327,7 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
 static int encode_instruction_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     if (inst->num_operands == NO_OPERANDS) 
         return TRUE;
-    
+
     if (inst->num_operands == ONE_OPERAND)
         return handle_one_operand_encoding(inst, operands, operand_start, symbol_table, memory, current_ic_ptr, instruction_word);
     else if (inst->num_operands == TWO_OPERANDS)
@@ -353,12 +353,12 @@ static int encode_instruction_word(const Instruction *inst, MemoryImage *memory,
 static int parse_instruction_operands(char **tokens, int token_count, int *operand_start_idx, int *operand_count) {
     int i;
     *operand_start_idx = 0;
-    
+
     if (has_label_in_tokens(tokens, token_count))
         *operand_start_idx = 2; /* Skip label and instruction name */
     else
         *operand_start_idx = 1; /* Skip only instruction name */
-    
+
     *operand_count = 0;
 
     for (i = *operand_start_idx; i < token_count; i++) {
@@ -369,12 +369,12 @@ static int parse_instruction_operands(char **tokens, int token_count, int *opera
 
 static int validate_operands(const Instruction *inst, char **operands, int operand_count) {
     int i;
-    
+
     for (i = 0; i < operand_count; i++) {
         int addr_mode_flag, legal_modes;
-        
+
         addr_mode_flag = get_addressing_mode(operands[i]);
-        
+
         /* Determine the legal addressing modes based on operand position (source/destination) */
         switch (inst->num_operands) {
             case TWO_OPERANDS:
@@ -403,19 +403,19 @@ static int validate_operands(const Instruction *inst, char **operands, int opera
 int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr) {
     int operand_start_idx, operand_count;
     MemoryWord *instruction_word;
-    
+
     /* Parse operands to get their starting index and count */
     if (!parse_instruction_operands(tokens, token_count, &operand_start_idx, &operand_count))
         return FALSE;
-    
+
     /* Validate addressing modes for the instruction's operands */
     if (!validate_operands(inst, tokens + operand_start_idx, operand_count)) 
         return FALSE;
-    
+
     /* Encode the first word of the instruction (opcode, ARE, addressing modes) */
     if (!encode_instruction_word(inst, memory, current_ic_ptr, &instruction_word))
         return FALSE;
-    
+
     /* Encode the subsequent operand words */
     return encode_instruction_operands(inst, tokens, operand_start_idx, operand_count, symbol_table, memory, current_ic_ptr, instruction_word);
 }

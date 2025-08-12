@@ -21,7 +21,7 @@ static void build_files(const char* base_filename, char* input_file, char* am_fi
 
 static int run_preprocessor(const char* input_file, const char* am_file, MacroTable *macro_table) {
     if (!preprocess_macros(input_file, am_file, macro_table)) {
-        fprintf(stderr, "Preprocessing failed for %s%c", input_file, NEWLINE);
+        print_error("Preprocessing failed", input_file);
         return FALSE;
     }
     return TRUE;
@@ -29,7 +29,7 @@ static int run_preprocessor(const char* input_file, const char* am_file, MacroTa
 
 static int run_first_pass(const char* am_file, SymbolTable *symbol_table, MemoryImage *memory) {
     if (first_pass(am_file, symbol_table, memory) == PASS_ERROR) {
-        fprintf(stderr, "First pass failed for %s%c", am_file, NEWLINE);
+        print_error("First pass failed", am_file);
         return FALSE;
     }
     return TRUE;
@@ -37,7 +37,7 @@ static int run_first_pass(const char* am_file, SymbolTable *symbol_table, Memory
 
 static int run_second_pass(const char* am_file, SymbolTable *symbol_table, MemoryImage *memory, const char* obj_file, const char* ent_file, const char* ext_file) {
     if (second_pass(am_file, symbol_table, memory, obj_file, ent_file, ext_file) == PASS_ERROR) {
-        fprintf(stderr, "Second pass failed for %s%c", am_file, NEWLINE);
+        print_error("Second pass failed", am_file);
         return FALSE;
     }
     return TRUE;
@@ -57,7 +57,7 @@ static int process_input_file(const char* base_filename, const int file_number,
     test_file = open_source_file(input_file);
 
     if (!test_file) {
-        fprintf(stderr, "File not found%c", NEWLINE);
+        print_error("File not found", input_file);
         return FALSE;
     }
     safe_fclose(&test_file);
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     int success_count = 0, total_files = argc - 1;
 
     if (argc < 2) {
-        fprintf(stderr, "Expected program call: %s <filename1> [filename2] ...%c", argv[0], NEWLINE);
+        print_error("Expected different app call", "./assembler <filename1> [filename2] ...");
         return 1;
     }
 
@@ -86,12 +86,12 @@ int main(int argc, char *argv[]) {
         init_memory(&memory);
 
         if (!init_symbol_table(&symbol_table)) {
-            fprintf(stderr, "Failed to initialize symbol table for %s%c", argv[i], NEWLINE);
+            print_error("Failed to initialize symbol table for file", argv[i]);
             continue;
         }
 
         if (!init_macro_table(&macro_table)) {
-            fprintf(stderr, "Failed to initialize macro table for %s%c", argv[i], NEWLINE);
+            print_error("Failed to initialize macro table for file", argv[i]);
             free_symbol_table(&symbol_table);
             continue;
         }
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     printf("Successfully processed: %d/%d files%c", success_count, total_files, NEWLINE);
 
     runtime_result = (success_count == total_files) ? 0 : 1;
-    printf("Assembler completed with exit code %d!%c", runtime_result, NEWLINE);
+    printf("%cAssembler completed with exit code %d!%c", NEWLINE, runtime_result, NEWLINE);
 
     return runtime_result;
 }

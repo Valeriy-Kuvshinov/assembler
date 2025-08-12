@@ -8,22 +8,6 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static char *clone_string(const char *src) {
-    char *copy;
-    size_t length;
-
-    if (!src) 
-        return NULL;
-
-    length = strlen(src);
-    copy = malloc(length + 1);
-
-    if (copy)
-        strcpy(copy, src);
-
-    return copy;
-}
-
 static int resize_tokens_array(ParseState *state) {
     int new_capacity = state->tokens_capacity * 2;
     char **new_tokens = realloc(state->tokens, (new_capacity + 1) * sizeof(char *));
@@ -45,7 +29,7 @@ static int finalize_token(ParseState *state) {
     }
 
     state->current_token[state->char_index] = NULL_TERMINATOR;
-    state->tokens[state->token_index] = clone_string(state->current_token);
+    state->tokens[state->token_index] = copy_string(state->current_token);
 
     if (!state->tokens[state->token_index]) {
         print_error(ERR_MEMORY_ALLOCATION, NULL);
@@ -73,14 +57,6 @@ static char *resize_token(char *current_token, int char_index, int *current_toke
     return current_token;
 }
 
-static int validate_comma(int token_index, int prev_was_comma) {
-    if (token_index == 0 || prev_was_comma) {
-        print_error(ERR_ILLEGAL_COMMA, NULL);
-        return FALSE;
-    }
-    return TRUE;
-}
-
 static int handle_whitespace(ParseState *state) {
     if (state->in_token) {
         if (!finalize_token(state))
@@ -95,9 +71,10 @@ static int handle_comma(ParseState *state) {
             return FALSE;
     }
 
-    if (!validate_comma(state->token_index, state->prev_was_comma))
+    if (state->token_index == 0 || state->prev_was_comma) {
+        print_error(ERR_ILLEGAL_COMMA, NULL);
         return FALSE;
-
+    }
     state->prev_was_comma = 1;
 
     return TRUE;

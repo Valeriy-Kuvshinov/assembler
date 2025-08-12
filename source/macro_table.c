@@ -142,9 +142,9 @@ void free_macro(Macro *macro) {
 
     if (macro->body) {
         for (i = 0; i < macro->line_count; i++) {
-            safe_free((void**)&macro->body[i]); /* free each line */
+            safe_free((void**)&macro->body[i]);
         }
-        safe_free((void**)&macro->body); /* free array of char* */
+        safe_free((void**)&macro->body);
     }
     macro->line_count = 0;
     macro->body_capacity = 0;
@@ -176,7 +176,6 @@ void free_macro_table(MacroTable *table) {
     for (i = 0; i < table->count; i++) {
         free_macro(&table->macros[i]);
     }
-
     safe_free((void**)&table->macros);
 
     table->count = 0;
@@ -227,9 +226,6 @@ int add_macro(MacroTable *table, const char *name) {
 }
 
 int add_line_to_macro(Macro *macro, const char *line_content) {
-    char *line_copy;
-    size_t length;
-
     if (!macro || !line_content || line_content[0] == NULL_TERMINATOR)
         return FALSE;
 
@@ -247,17 +243,13 @@ int add_line_to_macro(Macro *macro, const char *line_content) {
             return FALSE;
     }
 
-    length = strlen(line_content);
-    line_copy = malloc(length + 1);
+    macro->body[macro->line_count] = copy_string(line_content);
 
-    if (!line_copy) {
+    if (!macro->body[macro->line_count]) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to allocate memory for macro line");
         return FALSE;
     }
-
-    strcpy(line_copy, line_content);
-    macro->body[macro->line_count++] = line_copy;
-
+    macro->line_count++;
     return TRUE;
 }
 
