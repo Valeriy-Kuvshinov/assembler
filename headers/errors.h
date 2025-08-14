@@ -15,7 +15,6 @@
 
 /* Number / Operand */ 
 #define ERR_MISSING_HASH            "Immediate value requires '#' prefix"
-#define ERR_ILLEGAL_COMMA           "Illegal comma"
 #define ERR_CONSECUTIVE_COMMAS      "Consecutive commas"
 #define ERR_MISSING_COMMA           "Missing comma between operands"
 

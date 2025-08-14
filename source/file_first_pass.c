@@ -119,7 +119,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
     return error_flag ? FALSE : TRUE;
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
     FILE *fp = NULL;

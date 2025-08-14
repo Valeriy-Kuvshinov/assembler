@@ -13,10 +13,10 @@
 /* Inner STATIC methods */
 /* ==================================================================== */
 static int resize_macro_body(Macro *macro) {
-    int new_capacity;
     char **new_body;
+    int new_capacity;
 
-    if (!macro) 
+    if (!macro)
         return FALSE;
 
     new_capacity = (macro->body_capacity == 0) ? INITIAL_MACRO_BODY_CAPACITY : macro->body_capacity * 2;
@@ -26,7 +26,6 @@ static int resize_macro_body(Macro *macro) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to resize macro body");
         return FALSE;
     }
-
     macro->body = new_body;
     macro->body_capacity = new_capacity;
 
@@ -44,7 +43,6 @@ static int resize_macro_table(MacroTable *table) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to resize macro table");
         return FALSE;
     }
-
     table->macros = new_macros;
     table->capacity = new_capacity;
 
@@ -151,7 +149,7 @@ void free_macro(Macro *macro) {
     macro->name[0] = NULL_TERMINATOR;
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int init_macro_table(MacroTable *table) {
     table->macros = malloc(INITIAL_MACROS_CAPACITY * sizeof(Macro));
@@ -160,7 +158,6 @@ int init_macro_table(MacroTable *table) {
         print_error(ERR_MEMORY_ALLOCATION, "for macro table initialization");
         return FALSE;
     }
-
     table->count = 0;
     table->capacity = INITIAL_MACROS_CAPACITY;
 
@@ -255,7 +252,7 @@ int add_line_to_macro(Macro *macro, const char *line_content) {
 
 int is_macro_call(const char *line, const MacroTable *table) {
     char trimmed[MAX_LINE_LENGTH];
-    char *colon_pos;
+    char *colon_pos, *macro_part;
 
     strcpy(trimmed, line);
     trim_whitespace(trimmed);
@@ -264,7 +261,7 @@ int is_macro_call(const char *line, const MacroTable *table) {
     colon_pos = strchr(trimmed, LABEL_TERMINATOR);
 
     if (colon_pos) {
-        char *macro_part = colon_pos + 1;
+        macro_part = colon_pos + 1;
 
         while (isspace(*macro_part)) {
             macro_part++;

@@ -116,7 +116,7 @@ static int check_symbol_conflict(const Symbol *existing_symbol, int new_type, co
     return TRUE;
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int init_symbol_table(SymbolTable *table) {
     table->symbols = malloc(INITIAL_SYMBOLS_CAPACITY * sizeof(Symbol));

@@ -106,17 +106,13 @@ static int create_new_macro(MacroTable *table, const char *name, int line_num, M
     return TRUE;
 }
 
-static int process_macro_definition(char *line, MacroTable *macrotab, Macro **current_macro, int *in_macro_definition, int line_num) {
+static int process_macro_definition(char *line, MacroTable *macrotab, Macro **current_macro, int line_num) {
     char *name;
 
     if (!parse_macro_declaration(line, &name, line_num))
         return FALSE;
 
-    if (!create_new_macro(macrotab, name, line_num, current_macro))
-        return FALSE;
-
-    *in_macro_definition = 1;
-    return TRUE;
+    return create_new_macro(macrotab, name, line_num, current_macro);
 }
 
 static void process_macro_body(const char *original_line, Macro *current_macro, int line_num) {
@@ -152,7 +148,6 @@ static void write_macro_body(FILE *am, const Macro *macro, const char *indent) {
     size_t length;
 
     for (i = 0; i < macro->line_count; i++) {
-        /* Check if the line itself is not empty after processing */
         length = strlen(macro->body[i]);
 
         if (macro->body[i] && length > 0)
@@ -193,7 +188,7 @@ static int process_line(const char *original_line, const char *processed_line, F
     /* process lines within a macro definition */
     if (*in_macro_definition) {
         if (IS_MACRO_END(processed_line)) {
-            *in_macro_definition = 0;
+            *in_macro_definition = FALSE;
             *current_macro = NULL;
         } else
             process_macro_body(original_line, *current_macro, line_num);
@@ -204,29 +199,24 @@ static int process_line(const char *original_line, const char *processed_line, F
     /* process lines outside a macro definition */
     if (IS_MACRO_DEFINITION(processed_line)) {
         bounded_string_copy(temp_line, processed_line, sizeof(temp_line), "macro definition");
-
-        if (!process_macro_definition(temp_line, macrotab, current_macro, in_macro_definition, line_num))
-            return FALSE;
-
-        return TRUE;
+        *in_macro_definition = process_macro_definition(temp_line, macrotab, current_macro, line_num);
+        return *in_macro_definition;
     }
 
-    if (is_macro_call(processed_line, macrotab)) {
-        if (!process_macro_call_line(original_line, am_fp, macrotab, line_num))
-            return FALSE;
-    } else
-        fprintf(am_fp, "%s", original_line);
-
+    if (is_macro_call(processed_line, macrotab))
+        return process_macro_call_line(original_line, am_fp, macrotab, line_num);
+    
+    fprintf(am_fp, "%s", original_line);
     return TRUE;
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int preprocess_macros(const char *filename, const char *am_filename, MacroTable *macrotab) {
     FILE *src_fp = NULL, *am_fp = NULL;
     char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
-    int in_macro_definition = 0, line_num = 0;
-    int has_error = FALSE;
+    int line_num = 0;
+    int in_macro_definition = FALSE, has_error = FALSE;
     Macro *current_macro = NULL;
 
     src_fp = open_source_file(filename);

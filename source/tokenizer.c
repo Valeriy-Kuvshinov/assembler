@@ -9,8 +9,11 @@
 /* Inner STATIC methods */
 /* ==================================================================== */
 static int resize_tokens_array(ParseState *state) {
-    int new_capacity = state->tokens_capacity * 2;
-    char **new_tokens = realloc(state->tokens, (new_capacity + 1) * sizeof(char *));
+    char **new_tokens;
+    int new_capacity;
+
+    new_capacity = state->tokens_capacity * 2;
+    new_tokens = realloc(state->tokens, (new_capacity + 1) * sizeof(char *));
 
     if (!new_tokens) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to resize tokens array");
@@ -23,10 +26,8 @@ static int resize_tokens_array(ParseState *state) {
 }
 
 static int finalize_token(ParseState *state) {
-    if (state->token_index >= state->tokens_capacity) {
-        if (!resize_tokens_array(state))
-            return FALSE;
-    }
+    if ((state->token_index >= state->tokens_capacity) && (!resize_tokens_array(state)))
+        return FALSE;
 
     state->current_token[state->char_index] = NULL_TERMINATOR;
     state->tokens[state->token_index] = copy_string(state->current_token);
@@ -37,7 +38,6 @@ static int finalize_token(ParseState *state) {
     }
     state->token_index++;
     (*state->token_count)++;
-
     state->in_token = 0;
     state->char_index = 0;
 
@@ -57,22 +57,16 @@ static char *resize_token(char *current_token, int char_index, int *current_toke
     return current_token;
 }
 
-static int handle_whitespace(ParseState *state) {
-    if (state->in_token) {
-        if (!finalize_token(state))
-            return FALSE;
-    }
-    return TRUE;
+static int finalize_if_in_token(ParseState *state) {
+    return (!state->in_token || finalize_token(state));
 }
 
 static int handle_comma(ParseState *state) {
-    if (state->in_token) {
-        if (!finalize_token(state))
-            return FALSE;
-    }
+    if (!finalize_if_in_token(state))
+        return FALSE;
 
     if (state->token_index == 0 || state->prev_was_comma) {
-        print_error(ERR_ILLEGAL_COMMA, NULL);
+        print_error("Illegal comma in tokens", NULL);
         return FALSE;
     }
     state->prev_was_comma = 1;
@@ -80,29 +74,30 @@ static int handle_comma(ParseState *state) {
     return TRUE;
 }
 
-static int handle_character(ParseState *state, char c) {
+static int handle_character(ParseState *state, char cha) {
     if (!state->in_token) {
         state->in_token = 1;
         state->prev_was_comma = 0;
     }
+
     state->current_token = resize_token(state->current_token, state->char_index, &state->current_token_size);
 
     if (!state->current_token)
         return FALSE;
 
-    state->current_token[state->char_index] = c;
+    state->current_token[state->char_index] = cha;
     state->char_index++;
 
     return TRUE;
 }
 
-static int process_character(ParseState *state, char c) {
-    if (isspace(c))
-        return handle_whitespace(state);
-    else if (c == COMMA_CHAR)
+static int process_character(ParseState *state, char cha) {
+    if (isspace(cha))
+        return finalize_if_in_token(state);
+    else if (cha == COMMA_CHAR)
         return handle_comma(state);
     else
-        return handle_character(state, c);
+        return handle_character(state, cha);
 }
 
 static int init_parsing(ParseState *state, int *token_count_ptr) {
@@ -129,12 +124,17 @@ static int init_parsing(ParseState *state, int *token_count_ptr) {
     return TRUE;
 }
 
-/* Outer regular methods */
+static void cleanup_parse_state(ParseState *state) {
+    safe_free((void**)&state->current_token);
+    free_tokens(state->tokens, state->token_index);
+}
+
+/* Outer methods */
 /* ==================================================================== */
 void free_tokens(char **tokens, int token_count) {
     int i;
 
-    if (!tokens) 
+    if (!tokens)
         return;
 
     for (i = 0; i < token_count; i++) {
@@ -152,25 +152,18 @@ int parse_tokens(const char *line, char ***tokens_ptr, int *token_count) {
         return FALSE;
 
     while (*p) {
-        if (!process_character(&state, *p)) {
-            safe_free((void**)&state.current_token);
-            free_tokens(state.tokens, state.token_index);
-            
+        if (!process_character(&state, *p++)) {
+            cleanup_parse_state(&state);
             return FALSE;
         }
-        p++;
     }
 
-    /* Finalize any token that was being built when the line ended */
-    if (state.in_token) {
-        if (!finalize_token(&state)) {
-            safe_free((void**)&state.current_token);
-            free_tokens(state.tokens, state.token_index);
-
-            return FALSE;
-        }
+    if (!finalize_if_in_token(&state)) {
+        cleanup_parse_state(&state);
+        return FALSE;
     }
     safe_free((void**)&state.current_token);
+
     state.tokens[state.token_index] = NULL; 
     *tokens_ptr = state.tokens;
 

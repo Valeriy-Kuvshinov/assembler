@@ -100,10 +100,10 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
 
 static void write_instruction_lines(FILE *fp, MemoryImage *memory) {
     char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
-    int i;
+    int i, current_address;
 
     for (i = 0; i < memory->ic; i++) {
-        int current_address = IC_START + i;
+        current_address = IC_START + i;
 
         convert_to_base4_address(current_address, addr_str);
         convert_to_base4_word(memory->words[current_address].raw, value_str);
@@ -113,10 +113,10 @@ static void write_instruction_lines(FILE *fp, MemoryImage *memory) {
 
 static void write_data_lines(FILE *fp, MemoryImage *memory) {
     char addr_str[ADDR_LENGTH], value_str[WORD_LENGTH];
-    int i;
+    int i, current_address;
 
     for (i = 0; i < memory->dc; i++) {
-        int current_address = IC_START + memory->ic + i;
+        current_address = IC_START + memory->ic + i;
 
         convert_to_base4_address(current_address, addr_str);
         convert_to_base4_word(memory->words[i].raw, value_str);
@@ -160,18 +160,19 @@ static void write_entry_file(const char *filename, SymbolTable *symtab) {
 }
 
 static void write_extern_file(const char *filename, MemoryImage *memory, SymbolTable *symtab) {
+    const char *symbol_name;
     char addr_str[ADDR_LENGTH];
-    int i;
+    int i, ext_index;
     FILE *fp = open_output_file(filename);
 
     if (!fp)
         return;
 
     for (i = IC_START; i < IC_START + memory->ic; i++) {
-        int ext_index = memory->words[i].operand.ext_symbol_index;
+        ext_index = memory->words[i].operand.ext_symbol_index;
 
         if (memory->words[i].operand.are == ARE_EXTERNAL && ext_index >= 0) {
-            const char *symbol_name = symtab->symbols[ext_index].name;
+            symbol_name = symtab->symbols[ext_index].name;
 
             convert_to_base4_address(i, addr_str);
             write_file_line(fp, symbol_name, addr_str);
@@ -180,7 +181,7 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
     safe_fclose(&fp);
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int second_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory, const char *obj_file, const char *ent_file, const char *ext_file) {
     FILE *fp = open_source_file(filename);

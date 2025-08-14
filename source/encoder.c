@@ -10,6 +10,8 @@
 #include "instructions.h"
 #include "encoder.h"
 
+/* Inner STATIC methods */
+/* ==================================================================== */
 static int encode_immediate_operand(const char *operand, MemoryWord *word) {
     char *endptr;
     long value = strtol(operand + 1, &endptr, BASE10_ENCODING); /* Skip '#' */
@@ -57,39 +59,51 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symtab, Memor
     return TRUE;
 }
 
-static char* extract_between_brackets(char *start, char open_delim, char close_delim, char **out_substring) {
-    char *open, *close;
-
-    open = strchr(start, open_delim);
-
-    if (!open) 
+static char* extract_between_brackets(char *start, char open_bracket, char close_bracket, char **out_str) {
+    char *open_pos, *close_pos;
+    
+    if (!start || !out_str)
         return NULL;
 
-    close = strchr(open, close_delim);
+    open_pos = strchr(start, open_bracket);
 
-    if (!close) 
+    if (!open_pos)
         return NULL;
 
-    *close = NULL_TERMINATOR;
-    *out_substring = open + 1;
+    close_pos = strchr(open_pos + 1, close_bracket);
 
-    return close + 1;
+    if (!close_pos)
+        return NULL;
+
+    if (close_pos == open_pos + 1)
+        *out_str = NULL;  /* Empty content between brackets */
+    else
+        *out_str = open_pos + 1;  /* Skip opening bracket */
+
+    *close_pos = NULL_TERMINATOR;
+    
+    return close_pos + 1;
 }
 
 static int extract_matrix_registers(char *temp, char **reg1_str, char **reg2_str) {
     char *pos;
 
+    if (!temp || !reg1_str || !reg2_str) {
+        print_error(ERR_INVALID_MATRIX, "Null pointer in matrix register extraction");
+        return FALSE;
+    }
+
     pos = extract_between_brackets(temp, LEFT_BRACKET, RIGHT_BRACKET, reg1_str);
 
-    if (!pos) {
-        print_error(ERR_INVALID_MATRIX, "Missing first bracket pair");
+    if (!pos || !*reg1_str) {
+        print_error(ERR_INVALID_MATRIX, "Missing or empty first matrix register");
         return FALSE;
     }
 
     pos = extract_between_brackets(pos, LEFT_BRACKET, RIGHT_BRACKET, reg2_str);
 
-    if (!pos) {
-        print_error(ERR_INVALID_MATRIX, "Missing second bracket pair");
+    if (!pos || !*reg2_str) {
+        print_error(ERR_INVALID_MATRIX, "Missing or empty second matrix register");
         return FALSE;
     }
     return TRUE;
@@ -362,7 +376,6 @@ static int check_operands(const Instruction *inst, char **operands, int operand_
 
         addr_mode_flag = get_addressing_mode(operands[i]);
 
-        /* Determine the legal addressing modes based on operand position (source/destination) */
         switch (inst->num_operands) {
             case TWO_OPERANDS:
                 legal_modes = (i == 0) ? inst->legal_src_addr_modes : inst->legal_dest_addr_modes;
@@ -385,6 +398,8 @@ static int check_operands(const Instruction *inst, char **operands, int operand_
     return TRUE;
 }
 
+/* Outer methods */
+/* ==================================================================== */
 int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr) {
     int operand_start_index, operand_count;
     MemoryWord *instruction_word;

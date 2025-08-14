@@ -99,7 +99,7 @@ static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols)
 
 static int process_mat_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *matrix_def;
-    int rows, cols, i, value;
+    int rows, cols, i, value, token_index;
     int start_index = 0;
 
     if (token_count <= start_index + 2) {
@@ -119,7 +119,7 @@ static int process_mat_directive(char **tokens, int token_count, SymbolTable *sy
 
     /* Store values */
     for (i = 0; i < rows * cols; i++) {
-        int token_index = start_index + 2 + i;
+        token_index = start_index + 2 + i;
 
         if (!check_number(tokens[token_index], &value))
             return FALSE;
@@ -157,7 +157,7 @@ static int process_extern_directive(char **tokens, int token_count, SymbolTable 
     return add_symbol(symtab, tokens[start_index + 1], 0, EXTERNAL_SYMBOL);
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass) {
     if (token_count < 1)

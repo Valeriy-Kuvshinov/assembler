@@ -49,7 +49,7 @@ static int process_input_file(const char* base_filename, const int file_number, 
     char obj_file[MAX_FILENAME_LENGTH], ent_file[MAX_FILENAME_LENGTH], ext_file[MAX_FILENAME_LENGTH];
     FILE *test_file;
 
-    printf("Processing file %d of %d: %s%c", file_number, total_files, base_filename, NEWLINE);
+    printf("%cProcessing file %d of %d: %s%c", NEWLINE, file_number, total_files, base_filename, NEWLINE);
     build_files(base_filename, input_file, am_file, obj_file, ent_file, ext_file);
 
     test_file = open_source_file(input_file);

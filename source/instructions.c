@@ -136,7 +136,7 @@ int get_addressing_mode(const char *operand) {
 }
 
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
-    int i;
+    int i, mode;
     int length = 1;  /* Base instruction word */
 
     if (!inst || !operands)
@@ -146,7 +146,7 @@ int calculate_instruction_length(const Instruction *inst, char **operands, int o
         return -1;
 
     for (i = 0; i < operand_count; i++) {
-        int mode = get_addressing_mode(operands[i]);
+        mode = get_addressing_mode(operands[i]);
 
         if (mode == -1)
             return -1;

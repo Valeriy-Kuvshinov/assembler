@@ -7,16 +7,17 @@ static const char base4_digits[BASE4_ENCODING + 1] = {'a','b','c','d',NULL_TERMI
 /* Inner STATIC methods */
 /* ==================================================================== */
 static void reverse_string(char *str, int length) {
+    char temp;
     int i;
 
     for (i = 0; i < length / 2; i++) {
-        char temp = str[i];
+        temp = str[i];
         str[i] = str[length - 1 - i];
         str[length - 1 - i] = temp;
     }
 }
 
-/* Outer regular methods */
+/* Outer methods */
 /* ==================================================================== */
 void convert_to_base4_header(int value, char *result) {
     int i = 0;
@@ -24,7 +25,6 @@ void convert_to_base4_header(int value, char *result) {
     if (value == 0) {
         result[0] = base4_digits[0];
         result[1] = NULL_TERMINATOR;
-
         return;
     }
 
