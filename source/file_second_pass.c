@@ -40,7 +40,7 @@ static int encode_instruction(const Instruction *inst, char **tokens, int token_
     return encode_operands(inst, tokens, operand_start_index, operand_count, symtab, memory, current_ic_ptr, instruction_word);
 }
 
-static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr) {
+static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, int line_num) {
     int inst_index;
     const Instruction *inst;
 
@@ -48,20 +48,19 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     inst = get_instruction(tokens[inst_index]);
 
     if (!inst) {
-        print_error("Unknown instruction", tokens[inst_index]);
+        print_line_error("Unknown instruction", tokens[inst_index], line_num);
         return FALSE;
     }
     return encode_instruction(inst, tokens, token_count, symtab, memory, current_ic_ptr);
 }
 
-static int process_directive_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
+static int process_directive_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int line_num) {
     int direct_index;
     
     direct_index = get_item_index(tokens, token_count);
     
-    /* Check if there's actually a directive token after a potential label */
     if (direct_index >= token_count) {
-        print_error("Missing operand", "Missing directive after label");
+        print_line_error("Missing operand", "Missing directive after label", line_num);
         return FALSE;
     }
     return process_directive(tokens + direct_index, token_count - direct_index, symtab, memory, TRUE);
@@ -73,17 +72,12 @@ static int process_line(char **tokens, int token_count, SymbolTable *symtab, Mem
         return FALSE;
     }
 
-    /* Check if it's a directive line */
     if (is_directive_line(tokens, token_count)) {
-        if (!process_directive_line(tokens, token_count, symtab, memory)) {
-            print_line_error("Directive error", NULL, line_num);
+        if (!process_directive_line(tokens, token_count, symtab, memory, line_num)) {
             return FALSE;
         }
-    } else { /* Must be an instruction line */
-        if (!process_instruction_line(tokens, token_count, symtab, memory, current_ic_ptr)) {
-            print_line_error("Encoding error", NULL, line_num);
-            return FALSE;
-        }
+    } else if (!process_instruction_line(tokens, token_count, symtab, memory, current_ic_ptr, line_num)) {
+        return FALSE;
     }
     return TRUE;
 }
@@ -112,7 +106,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
 
         free_tokens(tokens, token_count);
     }
-    return error_flag ? FALSE : TRUE;
+    return (error_flag ? FALSE : TRUE);
 }
 
 static void write_instruction_lines(FILE *fp, MemoryImage *memory) {
@@ -188,7 +182,8 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
     for (i = IC_START; i < IC_START + memory->ic; i++) {
         ext_index = memory->words[i].operand.ext_symbol_index;
 
-        if ((memory->words[i].operand.are == ARE_EXTERNAL) && (ext_index >= 0)) {
+        if ((memory->words[i].operand.are == ARE_EXTERNAL) &&
+            (ext_index >= 0)) {
             symbol_name = symtab->symbols[ext_index].name;
 
             convert_to_base4_address(i, addr_str);

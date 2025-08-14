@@ -43,6 +43,14 @@ int has_externs(const SymbolTable *table);
 
 int is_valid_label(char *label);
 
-int process_label(char *label, SymbolTable *table, int address, int is_data);
+int process_label(char *label, SymbolTable *table, int address, int symbol_type);
+
+/* Validation macros */
+
+#define IS_EXTERNAL_SYMBOL(symbol) \
+    ((symbol).is_extern)
+
+#define IS_ENTRY_SYMBOL(symbol) \
+    ((symbol).is_entry)
 
 #endif

@@ -26,7 +26,8 @@ static int resize_tokens_array(ParseState *state) {
 }
 
 static int finalize_token(ParseState *state) {
-    if ((state->token_index >= state->tokens_capacity) && (!resize_tokens_array(state)))
+    if ((state->token_index >= state->tokens_capacity) &&
+        (!resize_tokens_array(state)))
         return FALSE;
 
     state->current_token[state->char_index] = NULL_TERMINATOR;

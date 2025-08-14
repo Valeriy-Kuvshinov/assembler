@@ -106,8 +106,10 @@ static int check_symbol_conflict(const Symbol *existing_symbol, int new_type, co
     if (!existing_symbol)
         return FALSE;
 
-    if (((existing_symbol->type == EXTERNAL_SYMBOL) && (new_type == ENTRY_SYMBOL)) ||
-        ((existing_symbol->type == ENTRY_SYMBOL) && (new_type == EXTERNAL_SYMBOL))) {
+    if ((IS_EXTERNAL_SYMBOL(*existing_symbol) &&
+        (new_type == ENTRY_SYMBOL)) ||
+        (IS_ENTRY_SYMBOL(*existing_symbol) &&
+        (new_type == EXTERNAL_SYMBOL))) {
         print_error("Label cannot be both .extern and .entry", name);
         return TRUE;
     }
@@ -170,7 +172,8 @@ int add_symbol(SymbolTable *table, const char *name, int value, int type) {
     if (check_symbol_conflict(existing_symbol, type, name))
         return FALSE;
 
-    if ((table->count >= table->capacity) && (!resize_symbol_table(table)))
+    if ((table->count >= table->capacity) &&
+        (!resize_symbol_table(table)))
         return FALSE;
 
     store_symbol(table, name, value, type);
@@ -185,7 +188,7 @@ int has_entries(const SymbolTable *table) {
         return FALSE;
 
     for (i = 0; i < table->count; i++) {
-        if (table->symbols[i].is_entry) 
+        if (IS_ENTRY_SYMBOL(table->symbols[i]))
             return TRUE;
     }
     return FALSE;
@@ -198,7 +201,7 @@ int has_externs(const SymbolTable *table) {
         return FALSE;
 
     for (i = 0; i < table->count; i++) {
-        if (table->symbols[i].type == EXTERNAL_SYMBOL) 
+        if (IS_EXTERNAL_SYMBOL(table->symbols[i]))
             return TRUE;
     }
     return FALSE;
@@ -219,7 +222,7 @@ int is_valid_label(char *label) {
     return TRUE;
 }
 
-int process_label(char *label, SymbolTable *table, int address, int is_data) {
+int process_label(char *label, SymbolTable *table, int address, int symbol_type) {
     extract_text_from_label(label);
-    return add_symbol(table, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
+    return add_symbol(table, label, address, symbol_type);
 }

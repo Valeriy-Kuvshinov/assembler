@@ -15,20 +15,32 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
+static void update_data_symbols(SymbolTable *symtab, int final_ic) {
+    int i;
+
+    for (i = 0; i < symtab->count; i++) {
+        if (symtab->symbols[i].type == DATA_SYMBOL)
+            symtab->symbols[i].value += IC_START + final_ic;
+    }
+}
+
+static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int line_num) {
     char **operands;
     int inst_index, operand_count, inst_length;
     const Instruction *inst;
 
     inst_index = has_label_in_tokens(tokens, token_count) ? 1 : 0;
 
-    if ((inst_index == 1) && (!process_label(tokens[0], symtab, IC_START + memory->ic, FALSE)))
+    if ((inst_index == 1) &&
+        (!process_label(tokens[0], symtab, IC_START + memory->ic, CODE_SYMBOL))) {
+        print_line_error("Failed to process label", tokens[0], line_num);
         return FALSE;
+    }
 
     inst = get_instruction(tokens[inst_index]);
 
     if (!inst) {
-        print_error("Unknown instruction", tokens[inst_index]);
+        print_line_error("Unknown instruction", tokens[inst_index], line_num);
         return FALSE;
     }
 
@@ -36,40 +48,42 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     operand_count = token_count - (inst_index + 1);
     inst_length = calculate_instruction_length(inst, operands, operand_count);
 
-    if (inst_length == -1) 
+    if (inst_length == -1) {
+        print_line_error("Invalid instruction length", inst->name, line_num);
         return FALSE;
+    }
 
     if (!check_ic_limit(memory->ic + inst_length))
         return FALSE;
 
     memory->ic += inst_length;
-
     return TRUE;
 }
 
-static int process_directive_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
+static int process_directive_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int line_num) {
     int direct_index, has_label;
+    const char *directive_name;
 
     has_label = has_label_in_tokens(tokens, token_count);
-    
-    if (has_label) {
-        if (!process_label(tokens[0], symtab, memory->dc, TRUE))
-            return FALSE;
+    direct_index = has_label ? 1 : 0;
 
-        direct_index = 1;
-    } else
-        direct_index = 0;
-    
-    return process_directive(tokens + direct_index, token_count - direct_index, symtab, memory, FALSE);
-}
-
-static void update_data_symbols(SymbolTable *symtab, int final_ic) {
-    int i;
-    
-    for (i = 0; i < symtab->count; i++) {
-        if (symtab->symbols[i].type == DATA_SYMBOL)
-            symtab->symbols[i].value += IC_START + final_ic;
+    if (direct_index >= token_count) {
+        print_line_error("Missing directive after label", tokens[0], line_num);
+        return FALSE;
     }
+
+    if (has_label) {
+        directive_name = tokens[direct_index];
+
+        if ((strcmp(directive_name, ENTRY_DIRECTIVE) == 0) ||
+            (strcmp(directive_name, EXTERN_DIRECTIVE) == 0))
+            print_line_warning("Label is before .extern / .entry, ignoring!", tokens[0], line_num);
+        else if (!process_label(tokens[0], symtab, memory->dc, DATA_SYMBOL)) {
+            print_line_error("Failed to process label", tokens[0], line_num);
+            return FALSE;
+        }
+    }
+    return process_directive(tokens + direct_index, token_count - direct_index, symtab, memory, FALSE);
 }
 
 static int process_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int line_num) {
@@ -79,16 +93,12 @@ static int process_line(char **tokens, int token_count, SymbolTable *symtab, Mem
     }
 
     if (is_directive_line(tokens, token_count)) {
-        if (!process_directive_line(tokens, token_count, symtab, memory)) {
-            print_line_error("Directive error", NULL, line_num);
+        if (!process_directive_line(tokens, token_count, symtab, memory, line_num))
             return FALSE;
-        }
-    } else { /* Must be instruction line */
-        if (!process_instruction_line(tokens, token_count, symtab, memory)) {
-            print_line_error("Instruction error", NULL, line_num);
-            return FALSE;
-        }
     }
+    else if (!process_instruction_line(tokens, token_count, symtab, memory, line_num))
+        return FALSE;
+    
     return TRUE;
 }
 
@@ -116,7 +126,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
 
         free_tokens(tokens, token_count);
     }
-    return error_flag ? FALSE : TRUE;
+    return (error_flag ? FALSE : TRUE);
 }
 
 /* Outer methods */

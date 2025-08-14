@@ -313,7 +313,8 @@ static int encode_two_operands(const Instruction *inst, char **operands, int ope
     instruction_word->instr.dest = dest_mode; /* Set destination addressing mode in instruction word */
 
     /* Two-register optimization: if both source and destination are registers, they share one word */
-    if ((src_mode == ADDR_MODE_REGISTER) && (dest_mode == ADDR_MODE_REGISTER))
+    if ((src_mode == ADDR_MODE_REGISTER) &&
+        (dest_mode == ADDR_MODE_REGISTER))
         return store_two_registers(memory, current_ic_ptr, src_operand_word, dest_operand_word);
     else {
         /* Store source operand */

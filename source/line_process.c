@@ -45,7 +45,8 @@ int check_line_format(char **tokens, int token_count) {
     }
     
     /* Rule: Cannot have label alone, must have either directive or instruction */
-    if ((has_label && token_count == 1) || (!has_directive && !has_instruction)) {
+    if ((has_label && (token_count == 1)) ||
+        (!has_directive && !has_instruction)) {
         print_error("Label must have data directive / instruction after it", NULL);
         return FALSE;
     }

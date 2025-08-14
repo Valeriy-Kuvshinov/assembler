@@ -204,12 +204,13 @@ int add_macro(MacroTable *table, const char *name) {
         return FALSE;
     }
 
-    if (find_macro(table, name) != NULL) {
+    if (find_macro(table, name)) {
         print_error("Duplicate macro name", name);
         return FALSE;
     }
 
-    if ((table->count >= table->capacity) && (!resize_macro_table(table)))
+    if ((table->count >= table->capacity) &&
+        (!resize_macro_table(table)))
         return FALSE;
 
     if (!store_macro(table, name)) {
@@ -232,7 +233,8 @@ int add_line_to_macro(Macro *macro, const char *line_content) {
         }
 
         macro->body_capacity = INITIAL_MACRO_BODY_CAPACITY;
-    } else if ((macro->line_count >= macro->body_capacity) && (!resize_macro_body(macro)))
+    } else if ((macro->line_count >= macro->body_capacity) &&
+                (!resize_macro_body(macro)))
         return FALSE;
 
     macro->body[macro->line_count] = copy_string(line_content);
@@ -261,7 +263,7 @@ int is_macro_call(const char *line, const MacroTable *table) {
         while (isspace(*macro_part)) {
             macro_part++;
         }
-        return find_macro(table, macro_part) != NULL;
+        return (find_macro(table, macro_part) != NULL);
     }
-    return find_macro(table, trimmed) != NULL;
+    return (find_macro(table, trimmed) != NULL);
 }
