@@ -65,7 +65,7 @@ static int handle_comma(ParseState *state) {
     if (!finalize_if_in_token(state))
         return FALSE;
 
-    if (state->token_index == 0 || state->prev_was_comma) {
+    if ((state->token_index == 0) || (state->prev_was_comma)) {
         print_error("Illegal comma in tokens", NULL);
         return FALSE;
     }

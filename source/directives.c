@@ -160,9 +160,6 @@ static int process_extern_directive(char **tokens, int token_count, SymbolTable 
 /* Outer methods */
 /* ==================================================================== */
 int process_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int is_second_pass) {
-    if (token_count < 1)
-        return FALSE;
-
     if (strcmp(tokens[0], DATA_DIRECTIVE) == 0) {
         if (is_second_pass) 
             return TRUE; /* Data already processed in first pass */

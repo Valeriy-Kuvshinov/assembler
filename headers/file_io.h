@@ -24,6 +24,8 @@ FILE *open_source_file(const char *filename);
 
 FILE *open_output_file(const char *filename);
 
+void write_file_line(FILE *fp, const char *part1, const char *part2);
+
 int preprocess_macros(const char* src_filename, const char* am_filename, MacroTable *macrotab);
 
 int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);

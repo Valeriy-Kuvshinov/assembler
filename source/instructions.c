@@ -154,9 +154,9 @@ int calculate_instruction_length(const Instruction *inst, char **operands, int o
         length += get_operand_word_cost(mode);
     }
 
-    if (operand_count == 2 &&
-        get_addressing_mode(operands[0]) == ADDR_MODE_REGISTER &&
-        get_addressing_mode(operands[1]) == ADDR_MODE_REGISTER)
+    if ((operand_count == 2) &&
+        (get_addressing_mode(operands[0]) == ADDR_MODE_REGISTER) &&
+        (get_addressing_mode(operands[1]) == ADDR_MODE_REGISTER))
         length--;  /* Two registers share one word */
 
     if (!check_instruction_limit(inst, length))

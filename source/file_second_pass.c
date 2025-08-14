@@ -17,8 +17,27 @@
 /* Inner STATIC methods */
 /* ==================================================================== */
 static int get_item_index(char **tokens, int token_count) {
-    /* Determine the index of an instruction / directive (skip label if present) */
-    return has_label_in_tokens(tokens, token_count) ? 1 : 0;
+    return has_label_in_tokens(tokens, token_count) ? 1 : 0; /* Determine the index of an instruction / directive */
+}
+
+static int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr) {
+    int operand_start_index, operand_count;
+    MemoryWord *instruction_word;
+
+    /* Parse operands to get their starting index and count */
+    if (!parse_operands(tokens, token_count, &operand_start_index, &operand_count))
+        return FALSE;
+
+    /* Validate addressing modes for the instruction's operands */
+    if (!check_operands(inst, tokens + operand_start_index, operand_count)) 
+        return FALSE;
+
+    /* Encode the first word of the instruction (opcode, ARE, addressing modes) */
+    if (!encode_instruction_word(inst, memory, current_ic_ptr, &instruction_word))
+        return FALSE;
+
+    /* Encode the subsequent operand words */
+    return encode_operands(inst, tokens, operand_start_index, operand_count, symtab, memory, current_ic_ptr, instruction_word);
 }
 
 static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr) {
@@ -32,7 +51,6 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
         print_error("Unknown instruction", tokens[inst_index]);
         return FALSE;
     }
-    /* Encode the instruction and its operands into memory */
     return encode_instruction(inst, tokens, token_count, symtab, memory, current_ic_ptr);
 }
 
@@ -78,7 +96,6 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
     while (fgets(line, sizeof(line), fp)) {
         line_num++;
 
-        /* Parse the line into tokens */
         if (!parse_tokens(line, &tokens, &token_count)) {
             print_line_error("Syntax error", NULL, line_num);
             error_flag = 1;
@@ -171,7 +188,7 @@ static void write_extern_file(const char *filename, MemoryImage *memory, SymbolT
     for (i = IC_START; i < IC_START + memory->ic; i++) {
         ext_index = memory->words[i].operand.ext_symbol_index;
 
-        if (memory->words[i].operand.are == ARE_EXTERNAL && ext_index >= 0) {
+        if ((memory->words[i].operand.are == ARE_EXTERNAL) && (ext_index >= 0)) {
             symbol_name = symtab->symbols[ext_index].name;
 
             convert_to_base4_address(i, addr_str);

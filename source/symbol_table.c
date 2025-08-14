@@ -106,8 +106,8 @@ static int check_symbol_conflict(const Symbol *existing_symbol, int new_type, co
     if (!existing_symbol)
         return FALSE;
 
-    if ((existing_symbol->type == EXTERNAL_SYMBOL && new_type == ENTRY_SYMBOL) ||
-        (existing_symbol->type == ENTRY_SYMBOL && new_type == EXTERNAL_SYMBOL)) {
+    if (((existing_symbol->type == EXTERNAL_SYMBOL) && (new_type == ENTRY_SYMBOL)) ||
+        ((existing_symbol->type == ENTRY_SYMBOL) && (new_type == EXTERNAL_SYMBOL))) {
         print_error("Label cannot be both .extern and .entry", name);
         return TRUE;
     }
@@ -170,7 +170,7 @@ int add_symbol(SymbolTable *table, const char *name, int value, int type) {
     if (check_symbol_conflict(existing_symbol, type, name))
         return FALSE;
 
-    if (table->count >= table->capacity && !resize_symbol_table(table))
+    if ((table->count >= table->capacity) && (!resize_symbol_table(table)))
         return FALSE;
 
     store_symbol(table, name, value, type);

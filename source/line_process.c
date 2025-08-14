@@ -14,7 +14,7 @@ int is_directive_line(char **tokens, int token_count) {
     
     /* Find the first non-label token */
     for (i = 0; i < token_count; i++) {
-        if (strchr(tokens[i], LABEL_TERMINATOR) == NULL)
+        if (!strchr(tokens[i], LABEL_TERMINATOR))
             return (IS_DIRECTIVE(tokens[i]));
     }
     return FALSE;

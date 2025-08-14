@@ -22,7 +22,7 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
 
     inst_index = has_label_in_tokens(tokens, token_count) ? 1 : 0;
 
-    if (inst_index == 1 && !process_label(tokens[0], symtab, IC_START + memory->ic, FALSE))
+    if ((inst_index == 1) && (!process_label(tokens[0], symtab, IC_START + memory->ic, FALSE)))
         return FALSE;
 
     inst = get_instruction(tokens[inst_index]);

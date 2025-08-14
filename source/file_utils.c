@@ -31,3 +31,7 @@ FILE *open_output_file(const char *filename) {
     
     return fp;
 }
+
+void write_file_line(FILE *fp, const char *part1, const char *part2) {
+    fprintf(fp, "%s %s%c", part1, part2, NEWLINE);
+}

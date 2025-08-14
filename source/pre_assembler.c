@@ -145,13 +145,10 @@ static void get_indentation(const char *line, char *indent) {
 
 static void write_macro_body(FILE *am, const Macro *macro, const char *indent) {
     int i;
-    size_t length;
 
     for (i = 0; i < macro->line_count; i++) {
-        length = strlen(macro->body[i]);
-
-        if (macro->body[i] && length > 0)
-            fprintf(am, "%s%s%c", indent, macro->body[i], NEWLINE);
+        if (macro->body[i] && macro->body[i][0] != NULL_TERMINATOR)
+            write_file_line(am, indent, macro->body[i]);
     }
 }
 
@@ -249,5 +246,5 @@ int preprocess_macros(const char *filename, const char *am_filename, MacroTable 
     safe_fclose(&src_fp);
     safe_fclose(&am_fp);
 
-    return has_error ? PASS_ERROR : TRUE;
+    return (has_error ? PASS_ERROR : TRUE);
 }

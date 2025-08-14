@@ -71,7 +71,7 @@ static int is_valid_syntax(const char *macro) {
     }
 
     for (i = 1; i < length; i++) {
-        if (!isalnum(macro[i]) && macro[i] != UNDERSCORE_CHAR) {
+        if (!isalnum(macro[i]) && (macro[i] != UNDERSCORE_CHAR)) {
             print_error(ERR_MACRO_SYNTAX, macro);
             return FALSE;
         }
@@ -102,8 +102,7 @@ static int is_reserved_word(const char *macro) {
     return FALSE;
 }
 
-/* Initializes a single Macro to a known empty state */
-int init_macro(Macro *macro, const char *name) {
+static int init_macro(Macro *macro, const char *name) {
     if (!macro) {
         print_error(ERR_MEMORY_ALLOCATION, "for macro initialization");
         return FALSE;
@@ -210,10 +209,8 @@ int add_macro(MacroTable *table, const char *name) {
         return FALSE;
     }
 
-    if (table->count >= table->capacity) {
-        if (!resize_macro_table(table))
-            return FALSE;
-    }
+    if ((table->count >= table->capacity) && (!resize_macro_table(table)))
+        return FALSE;
 
     if (!store_macro(table, name)) {
         print_error("Failed to store macro", name);
@@ -223,10 +220,10 @@ int add_macro(MacroTable *table, const char *name) {
 }
 
 int add_line_to_macro(Macro *macro, const char *line_content) {
-    if (!macro || !line_content || line_content[0] == NULL_TERMINATOR)
+    if (!macro || !line_content || (line_content[0] == NULL_TERMINATOR))
         return FALSE;
 
-    if (macro->body == NULL) {
+    if (!macro->body) {
         macro->body = malloc(INITIAL_MACRO_BODY_CAPACITY * sizeof(char*));
 
         if (!macro->body) {
@@ -235,10 +232,8 @@ int add_line_to_macro(Macro *macro, const char *line_content) {
         }
 
         macro->body_capacity = INITIAL_MACRO_BODY_CAPACITY;
-    } else if (macro->line_count >= macro->body_capacity) {
-        if (!resize_macro_body(macro))
-            return FALSE;
-    }
+    } else if ((macro->line_count >= macro->body_capacity) && (!resize_macro_body(macro)))
+        return FALSE;
 
     macro->body[macro->line_count] = copy_string(line_content);
 

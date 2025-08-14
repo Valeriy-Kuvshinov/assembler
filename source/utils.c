@@ -105,10 +105,6 @@ void print_line_warning(const char *message, const char *context, int line_num) 
         printf("Warning: %s at line %d%c", message, line_num, NEWLINE);
 }
 
-void write_file_line(FILE *fp, const char *part1, const char *part2) {
-    fprintf(fp, "%s %s%c", part1, part2, NEWLINE);
-}
-
 void safe_free(void **ptr) {
     if (ptr && *ptr) {
         free(*ptr);
