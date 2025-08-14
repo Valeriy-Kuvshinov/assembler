@@ -10,19 +10,6 @@
 #include "instructions.h"
 #include "encoder.h"
 
-static int get_addressing_mode(const char *operand) {
-    if (operand[0] == IMMEDIATE_PREFIX)
-        return ADDR_MODE_IMMEDIATE;
-
-    if (strchr(operand, LEFT_BRACKET))
-        return ADDR_MODE_MATRIX;
-
-    if (operand[0] == REGISTER_CHAR && isdigit(operand[1]) && operand[2] == NULL_TERMINATOR)
-        return ADDR_MODE_REGISTER;
-
-    return ADDR_MODE_DIRECT;
-}
-
 static int encode_immediate_operand(const char *operand, MemoryWord *word) {
     char *endptr;
     long value = strtol(operand + 1, &endptr, BASE10_ENCODING); /* Skip '#' */
@@ -50,8 +37,8 @@ static int encode_register_operand(const char *operand, MemoryWord *word) {
     return TRUE;
 }
 
-static int encode_symbol_operand(const char *operand, SymbolTable *symbol_table, MemoryWord *word) {
-    Symbol *sym = find_symbol(symbol_table, operand);
+static int encode_symbol_operand(const char *operand, SymbolTable *symtab, MemoryWord *word) {
+    Symbol *sym = find_symbol(symtab, operand);
     
     if (!sym) {
         print_error("Symbol not found", operand);
@@ -61,7 +48,7 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symbol_table,
     if (sym->type == EXTERNAL_SYMBOL) {
         word->operand.value = 0;
         word->operand.are = ARE_EXTERNAL;
-        word->operand.ext_symbol_index = (int)(sym - symbol_table->symbols);
+        word->operand.ext_symbol_index = (int)(sym - symtab->symbols);
     } else {
         word->operand.value = sym->value & WORD_MASK;
         word->operand.are = ARE_RELOCATABLE;
@@ -139,7 +126,7 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
     return TRUE;
 }
 
-static int encode_matrix_operand(const char *operand, SymbolTable *symbol_table, MemoryWord *word, MemoryWord *next_word) {
+static int encode_matrix_operand(const char *operand, SymbolTable *symtab, MemoryWord *word, MemoryWord *next_word) {
     char label[MAX_LABEL_NAME_LENGTH];
     char *bracket = strchr(operand, LEFT_BRACKET);
     int base_reg, index_reg;
@@ -162,7 +149,7 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symbol_table,
         return FALSE;
 
     /* Encode the label part (first word of matrix operand) */
-    if (!encode_symbol_operand(label, symbol_table, word))
+    if (!encode_symbol_operand(label, symtab, word))
         return FALSE;
 
     next_word->raw = 0; /* Clear bits before setting */
@@ -173,7 +160,7 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symbol_table,
     return TRUE;
 }
 
-static int encode_operand(const char *operand, SymbolTable *symbol_table, MemoryWord *word, int is_dest, MemoryWord *next_word) {
+static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *word, int is_dest, MemoryWord *next_word) {
     word->raw = 0;
     word->operand.ext_symbol_index = -1;
 
@@ -194,11 +181,11 @@ static int encode_operand(const char *operand, SymbolTable *symbol_table, Memory
     }
     /* Matrix access (label[rX][rY]) */
     else if (strchr(operand, LEFT_BRACKET)) {
-        if (!encode_matrix_operand(operand, symbol_table, word, next_word)) 
+        if (!encode_matrix_operand(operand, symtab, word, next_word)) 
             return FALSE;
     }
     /* Symbol/label (direct addressing) */
-    else if (!encode_symbol_operand(operand, symbol_table, word)) 
+    else if (!encode_symbol_operand(operand, symtab, word)) 
         return FALSE;
 
     return TRUE;
@@ -207,7 +194,7 @@ static int encode_operand(const char *operand, SymbolTable *symbol_table, Memory
 static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWord operand_word) {
     int addr_index;
 
-    if (!validate_ic_limit(*current_ic_ptr + 1))
+    if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
 
     /* Store the word at the calculated instruction address */
@@ -221,7 +208,7 @@ static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWo
 static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg_value, int shift) {
     MemoryWord *target_word;
 
-    if (!validate_ic_limit(*current_ic_ptr + 1))
+    if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
 
     target_word = &memory->words[IC_START + (*current_ic_ptr)];
@@ -241,7 +228,7 @@ static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg
 static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryWord src_word, MemoryWord dest_word) {
     MemoryWord *target_word;
 
-    if (!validate_ic_limit(*current_ic_ptr + 1))
+    if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
 
     target_word = &memory->words[IC_START + (*current_ic_ptr)];
@@ -271,14 +258,14 @@ static int process_operand_storage(MemoryImage *memory, int *current_ic_ptr, int
     return TRUE;
 }
 
-static int handle_one_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
+static int handle_one_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     int src_mode;
     MemoryWord operand_word, next_operand_word; 
     operand_word.raw = 0;
     next_operand_word.raw = 0;
 
     /* Encode the single operand (which is always the destination) */
-    if (!encode_operand(operands[operand_start], symbol_table, &operand_word, FALSE, &next_operand_word))
+    if (!encode_operand(operands[operand_start], symtab, &operand_word, FALSE, &next_operand_word))
         return FALSE;
 
     src_mode = get_addressing_mode(operands[operand_start]);
@@ -289,7 +276,7 @@ static int handle_one_operand_encoding(const Instruction *inst, char **operands,
     return process_operand_storage(memory, current_ic_ptr, src_mode, operand_word, next_operand_word, 2);
 }
 
-static int handle_two_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
+static int handle_two_operand_encoding(const Instruction *inst, char **operands, int operand_start, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     int src_mode, dest_mode;
     MemoryWord src_operand_word, src_next_operand_word, dest_operand_word, dest_next_operand_word; 
     src_operand_word.raw = 0;
@@ -298,14 +285,14 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
     dest_next_operand_word.raw = 0;
 
     /* Encode source operand */
-    if (!encode_operand(operands[operand_start], symbol_table, &src_operand_word, FALSE, &src_next_operand_word))
+    if (!encode_operand(operands[operand_start], symtab, &src_operand_word, FALSE, &src_next_operand_word))
         return FALSE;
 
     src_mode = get_addressing_mode(operands[operand_start]);
     instruction_word->instr.src = src_mode;
 
     /* Encode destination operand */
-    if (!encode_operand(operands[operand_start + 1], symbol_table, &dest_operand_word, TRUE, &dest_next_operand_word))
+    if (!encode_operand(operands[operand_start + 1], symtab, &dest_operand_word, TRUE, &dest_next_operand_word))
         return FALSE;
 
     dest_mode = get_addressing_mode(operands[operand_start + 1]);
@@ -324,20 +311,20 @@ static int handle_two_operand_encoding(const Instruction *inst, char **operands,
     }
 }
 
-static int encode_instruction_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
+static int encode_instruction_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     if (inst->num_operands == NO_OPERANDS) 
         return TRUE;
 
     if (inst->num_operands == ONE_OPERAND)
-        return handle_one_operand_encoding(inst, operands, operand_start, symbol_table, memory, current_ic_ptr, instruction_word);
+        return handle_one_operand_encoding(inst, operands, operand_start, symtab, memory, current_ic_ptr, instruction_word);
     else if (inst->num_operands == TWO_OPERANDS)
-        return handle_two_operand_encoding(inst, operands, operand_start, symbol_table, memory, current_ic_ptr, instruction_word);
+        return handle_two_operand_encoding(inst, operands, operand_start, symtab, memory, current_ic_ptr, instruction_word);
 
     return FALSE;
 }
 
 static int encode_instruction_word(const Instruction *inst, MemoryImage *memory, int *current_ic_ptr, MemoryWord **current_word_ptr) {
-    if (!validate_ic_limit(*current_ic_ptr + 1))
+    if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
 
     *current_word_ptr = &memory->words[IC_START + *current_ic_ptr];
@@ -350,24 +337,24 @@ static int encode_instruction_word(const Instruction *inst, MemoryImage *memory,
     return TRUE;
 }
 
-static int parse_instruction_operands(char **tokens, int token_count, int *operand_start_idx, int *operand_count) {
+static int parse_instruction_operands(char **tokens, int token_count, int *operand_start_index, int *operand_count) {
     int i;
-    *operand_start_idx = 0;
+    *operand_start_index = 0;
 
     if (has_label_in_tokens(tokens, token_count))
-        *operand_start_idx = 2; /* Skip label and instruction name */
+        *operand_start_index = 2; /* Skip label and instruction name */
     else
-        *operand_start_idx = 1; /* Skip only instruction name */
+        *operand_start_index = 1; /* Skip only instruction name */
 
     *operand_count = 0;
 
-    for (i = *operand_start_idx; i < token_count; i++) {
+    for (i = *operand_start_index; i < token_count; i++) {
         (*operand_count)++;
     }
     return TRUE;
 }
 
-static int validate_operands(const Instruction *inst, char **operands, int operand_count) {
+static int check_operands(const Instruction *inst, char **operands, int operand_count) {
     int i;
 
     for (i = 0; i < operand_count; i++) {
@@ -387,8 +374,6 @@ static int validate_operands(const Instruction *inst, char **operands, int opera
                 legal_modes = 0; /* No operands, so no legal modes */
                 break;
             default:
-                /* This case should ideally not be reached if inst->num_operands is correctly set */
-                print_error("Internal error: Invalid number of operands for instruction", inst->name);
                 return FALSE;
         }
         /* Check if the operand's addressing mode is allowed */
@@ -400,16 +385,16 @@ static int validate_operands(const Instruction *inst, char **operands, int opera
     return TRUE;
 }
 
-int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int *current_ic_ptr) {
-    int operand_start_idx, operand_count;
+int encode_instruction(const Instruction *inst, char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr) {
+    int operand_start_index, operand_count;
     MemoryWord *instruction_word;
 
     /* Parse operands to get their starting index and count */
-    if (!parse_instruction_operands(tokens, token_count, &operand_start_idx, &operand_count))
+    if (!parse_instruction_operands(tokens, token_count, &operand_start_index, &operand_count))
         return FALSE;
 
     /* Validate addressing modes for the instruction's operands */
-    if (!validate_operands(inst, tokens + operand_start_idx, operand_count)) 
+    if (!check_operands(inst, tokens + operand_start_index, operand_count)) 
         return FALSE;
 
     /* Encode the first word of the instruction (opcode, ARE, addressing modes) */
@@ -417,5 +402,5 @@ int encode_instruction(const Instruction *inst, char **tokens, int token_count, 
         return FALSE;
 
     /* Encode the subsequent operand words */
-    return encode_instruction_operands(inst, tokens, operand_start_idx, operand_count, symbol_table, memory, current_ic_ptr, instruction_word);
+    return encode_instruction_operands(inst, tokens, operand_start_index, operand_count, symtab, memory, current_ic_ptr, instruction_word);
 }

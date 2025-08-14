@@ -8,7 +8,7 @@
 #include "instructions.h"
 
 static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
-  /* Group 0: Two operands */
+  /* group I: 2 operands */
   {
     "mov", 0, TWO_OPERANDS,
     ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
@@ -35,7 +35,7 @@ static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
     ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
   },
 
-  /* Group 1: One operand */
+  /* group II: 1 operand */
   {
     "clr", 5, ONE_OPERAND, 0,
     ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
@@ -73,10 +73,41 @@ static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
     ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
   },
 
-  /* Group 2: No operands */
+  /* group III: 0 operands */
   {"rts", 14, NO_OPERANDS, 0, 0},
   {"stop", 15, NO_OPERANDS, 0, 0}
 };
+
+static int check_operand_count(const Instruction *inst, int operand_count) {
+    if (operand_count != inst->num_operands) {
+        printf("Invalid operand amount for instruction (%d / %d)", inst->num_operands, operand_count);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int check_instruction_limit(const Instruction *inst, int length) {
+    if (length > MAX_INSTRUCTION_WORDS) {
+        print_error("Instruction exceeds the 5-word limit", inst->name);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int get_operand_word_cost(int addressing_mode) {
+    switch (addressing_mode) {
+        case ADDR_MODE_IMMEDIATE:
+            return 1;
+        case ADDR_MODE_MATRIX:
+            return 2;
+        case ADDR_MODE_REGISTER:
+            return 1;
+        case ADDR_MODE_DIRECT:
+            return 1;
+        default:
+            return 0;
+    }
+}
 
 const Instruction* get_instruction(const char *name) {
     int i;
@@ -88,36 +119,48 @@ const Instruction* get_instruction(const char *name) {
     return NULL;
 }
 
+int get_addressing_mode(const char *operand) {
+    if (!operand || !*operand) 
+        return -1;
+
+    if (operand[0] == IMMEDIATE_PREFIX) 
+        return ADDR_MODE_IMMEDIATE;
+
+    if (strchr(operand, LEFT_BRACKET)) 
+        return ADDR_MODE_MATRIX;
+
+    if (IS_REGISTER(operand)) 
+        return ADDR_MODE_REGISTER;
+
+    return ADDR_MODE_DIRECT;
+}
+
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
     int i;
-    int length = 1; /* Base instruction word */
+    int length = 1;  /* Base instruction word */
 
-    if (operand_count > MAX_INSTRUCTION_WORDS) {
-        print_error("Instruction exceeds 5-word limit", inst->name);
+    if (!inst || !operands)
         return -1;
-    }
+    
+    if (!check_operand_count(inst, operand_count))
+        return -1;
 
     for (i = 0; i < operand_count; i++) {
-        if (operands[i][0] == IMMEDIATE_PREFIX)
-            length++;
-        else if (strchr(operands[i], LEFT_BRACKET))
-            length += 2;
-        else if (operands[i][0] == REGISTER_CHAR &&
-                 isdigit(operands[i][1]) && operands[i][2] == NULL_TERMINATOR)
-            length++;
-        else
-            length++;
+        int mode = get_addressing_mode(operands[i]);
+
+        if (mode == -1)
+            return -1;
+        
+        length += get_operand_word_cost(mode);
     }
 
-    /* If instruction has 2 register operands, they can share 1 word */
-    if (operand_count == 2) {
-        int reg1 = (operands[0][0] == REGISTER_CHAR &&
-                     isdigit(operands[0][1]) && operands[0][2] == NULL_TERMINATOR);
-        int reg2 = (operands[1][0] == REGISTER_CHAR &&
-                    isdigit(operands[1][1]) && operands[1][2] == NULL_TERMINATOR);
+    if (operand_count == 2 &&
+        get_addressing_mode(operands[0]) == ADDR_MODE_REGISTER &&
+        get_addressing_mode(operands[1]) == ADDR_MODE_REGISTER)
+        length--;  /* Two registers share one word */
 
-        if (reg1 && reg2)
-            length--;
-    }
+    if (!check_instruction_limit(inst, length))
+        return -1;
+
     return length;
 }

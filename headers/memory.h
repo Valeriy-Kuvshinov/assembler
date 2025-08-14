@@ -72,16 +72,17 @@ typedef struct {
 
 void init_memory(MemoryImage *memory);
 
-int validate_ic_limit(int current_ic);
+int check_ic_limit(int current_ic);
 
-int validate_dc_limit(int current_dc);
+int check_dc_limit(int current_dc);
 
 int store_value(MemoryImage *memory, int value);
 
 /* Validation macros */
 
 #define IS_REGISTER(str) \
-    ((str)[0] == REGISTER_CHAR && (str)[1] >= MIN_REGISTER && (str)[1] <= MAX_REGISTER && (str)[2] == NULL_TERMINATOR)
+    ((str)[0] == REGISTER_CHAR && (str)[1] >= MIN_REGISTER && \
+     (str)[1] <= MAX_REGISTER && (str)[2] == NULL_TERMINATOR)
 
 #define IS_PSW(str) \
     (strcmp((str), PSW_REGISTER) == 0)

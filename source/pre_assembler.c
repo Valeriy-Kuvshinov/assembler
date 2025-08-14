@@ -75,7 +75,7 @@ static int parse_macro_declaration(char *line, char **name, int line_num) {
     return TRUE;
 }
 
-static int validate_macro_name(const char *name, int line_num) {
+static int check_macro_name(const char *name, int line_num) {
     if (!is_valid_macro_start(name)) {
         print_line_error("Invalid macro name", name, line_num);
         return FALSE;
@@ -92,7 +92,7 @@ static int check_macro_duplicate(const MacroTable *table, const char *name, int 
 }
 
 static int create_new_macro(MacroTable *table, const char *name, int line_num, Macro **out_macro) {
-    if (!validate_macro_name(name, line_num))
+    if (!check_macro_name(name, line_num))
         return FALSE;
 
     if (!check_macro_duplicate(table, name, line_num))
@@ -106,13 +106,13 @@ static int create_new_macro(MacroTable *table, const char *name, int line_num, M
     return TRUE;
 }
 
-static int process_macro_definition(char *line, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_num) {
+static int process_macro_definition(char *line, MacroTable *macrotab, Macro **current_macro, int *in_macro_definition, int line_num) {
     char *name;
 
     if (!parse_macro_declaration(line, &name, line_num))
         return FALSE;
 
-    if (!create_new_macro(macro_table, name, line_num, current_macro))
+    if (!create_new_macro(macrotab, name, line_num, current_macro))
         return FALSE;
 
     *in_macro_definition = 1;
@@ -160,7 +160,7 @@ static void write_macro_body(FILE *am, const Macro *macro, const char *indent) {
     }
 }
 
-static int process_macro_call_line(const char *line, FILE *am, const MacroTable *macro_table, int line_num) {
+static int process_macro_call_line(const char *line, FILE *am, const MacroTable *macrotab, int line_num) {
     char *macro_name;
     char indent[MAX_LINE_LENGTH] = "";
     const Macro *macro;
@@ -172,7 +172,7 @@ static int process_macro_call_line(const char *line, FILE *am, const MacroTable 
         return FALSE;
     }
 
-    macro = find_macro(macro_table, macro_name);
+    macro = find_macro(macrotab, macro_name);
 
     if (!macro) {
         print_line_error("Undefined macro", macro_name, line_num);
@@ -184,7 +184,7 @@ static int process_macro_call_line(const char *line, FILE *am, const MacroTable 
     return TRUE;
 }
 
-static int process_line(const char *original_line, const char *processed_line, FILE *am_fp, MacroTable *macro_table, Macro **current_macro, int *in_macro_definition, int line_num) {
+static int process_line(const char *original_line, const char *processed_line, FILE *am_fp, MacroTable *macrotab, Macro **current_macro, int *in_macro_definition, int line_num) {
     char temp_line[MAX_LINE_LENGTH];
 
     if (is_empty_line(processed_line))
@@ -205,14 +205,14 @@ static int process_line(const char *original_line, const char *processed_line, F
     if (IS_MACRO_DEFINITION(processed_line)) {
         bounded_string_copy(temp_line, processed_line, sizeof(temp_line), "macro definition");
 
-        if (!process_macro_definition(temp_line, macro_table, current_macro, in_macro_definition, line_num))
+        if (!process_macro_definition(temp_line, macrotab, current_macro, in_macro_definition, line_num))
             return FALSE;
 
         return TRUE;
     }
 
-    if (is_macro_call(processed_line, macro_table)) {
-        if (!process_macro_call_line(original_line, am_fp, macro_table, line_num))
+    if (is_macro_call(processed_line, macrotab)) {
+        if (!process_macro_call_line(original_line, am_fp, macrotab, line_num))
             return FALSE;
     } else
         fprintf(am_fp, "%s", original_line);
@@ -222,7 +222,7 @@ static int process_line(const char *original_line, const char *processed_line, F
 
 /* Outer regular methods */
 /* ==================================================================== */
-int preprocess_macros(const char *filename, const char *am_filename, MacroTable *macro_table) {
+int preprocess_macros(const char *filename, const char *am_filename, MacroTable *macrotab) {
     FILE *src_fp = NULL, *am_fp = NULL;
     char line[MAX_LINE_LENGTH], original_line[MAX_LINE_LENGTH], processed_line[MAX_LINE_LENGTH];
     int in_macro_definition = 0, line_num = 0;
@@ -248,7 +248,7 @@ int preprocess_macros(const char *filename, const char *am_filename, MacroTable 
         bounded_string_copy(processed_line, line, sizeof(processed_line), "line processing");
         preprocess_line(processed_line);
 
-        if (!process_line(original_line, processed_line, am_fp, macro_table, &current_macro, &in_macro_definition, line_num))
+        if (!process_line(original_line, processed_line, am_fp, macrotab, &current_macro, &in_macro_definition, line_num))
             has_error = TRUE;
     }
 

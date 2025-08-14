@@ -41,7 +41,8 @@ int is_macro_call(const char *line, const MacroTable *table);
 /* Validation macros */
 
 #define IS_MACRO_KEYWORD(label) \
-    (strcmp((label), MACRO_START) == 0 || strcmp((label), MACRO_END) == 0)
+    (strcmp((label), MACRO_START) == 0 || \
+     strcmp((label), MACRO_END) == 0)
 
 #define IS_MACRO_DEFINITION(line) \
     (strncmp((line), MACRO_START, strlen(MACRO_START)) == 0)

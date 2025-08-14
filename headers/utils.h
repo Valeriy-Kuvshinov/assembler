@@ -50,6 +50,8 @@ void print_line_error(const char *message, const char *context, int line_num);
 
 void print_line_warning(const char *message, const char *context, int line_num);
 
+void write_file_line(FILE *fp, const char *part1, const char *part2);
+
 void safe_free(void **ptr);
 
 #endif

@@ -27,22 +27,22 @@ typedef struct {
 
 /* Function prototypes */
 
-int init_symbol_table(SymbolTable *symtab);
+int init_symbol_table(SymbolTable *table);
 
-void free_symbol_table(SymbolTable *symtab);
+void free_symbol_table(SymbolTable *table);
 
 void extract_text_from_label(char *label);
 
-Symbol* find_symbol(SymbolTable *symtab, const char *name);
+Symbol* find_symbol(SymbolTable *table, const char *name);
 
-int add_symbol(SymbolTable *symtab, const char *name, int value, int type);
+int add_symbol(SymbolTable *table, const char *name, int value, int type);
 
-int has_entries(const SymbolTable *symtab);
+int has_entries(const SymbolTable *table);
 
-int has_externs(const SymbolTable *symtab);
+int has_externs(const SymbolTable *table);
 
 int is_valid_label(char *label);
 
-int process_label(char *label, SymbolTable *symtab, int address, int is_data);
+int process_label(char *label, SymbolTable *table, int address, int is_data);
 
 #endif

@@ -15,45 +15,31 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int validate_operand_count(const Instruction *inst, int operand_count, const char *inst_name) {
-    if (operand_count != inst->num_operands) {
-        fprintf(stderr, "Invalid operand amount (%d / %d)", inst->num_operands, operand_count);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static int process_instruction_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory) {
-    int instruction_index, operand_start, operand_count, inst_length, has_label;
+static int process_instruction_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
+    char **operands;
+    int inst_index, operand_count, inst_length;
     const Instruction *inst;
 
-    has_label = has_label_in_tokens(tokens, token_count);
+    inst_index = has_label_in_tokens(tokens, token_count) ? 1 : 0;
 
-    if (has_label) {
-        if (!process_label(tokens[0], symbol_table, IC_START + memory->ic, FALSE))
-            return FALSE;
+    if (inst_index == 1 && !process_label(tokens[0], symtab, IC_START + memory->ic, FALSE))
+        return FALSE;
 
-        instruction_index = 1;
-    } else
-        instruction_index = 0;
-
-    inst = get_instruction(tokens[instruction_index]);
+    inst = get_instruction(tokens[inst_index]);
 
     if (!inst) {
-        print_error("Unknown instruction", tokens[instruction_index]);
+        print_error("Unknown instruction", tokens[inst_index]);
         return FALSE;
     }
 
-    /* Calculate and validate operands */
-    operand_start = instruction_index + 1;
-    operand_count = token_count - operand_start;
+    operands = tokens + inst_index + 1;
+    operand_count = token_count - (inst_index + 1);
+    inst_length = calculate_instruction_length(inst, operands, operand_count);
 
-    if (!validate_operand_count(inst, operand_count, tokens[instruction_index]))
+    if (inst_length == -1) 
         return FALSE;
 
-    inst_length = calculate_instruction_length(inst, tokens + operand_start, operand_count);
-
-    if (inst_length == -1 || !validate_ic_limit(memory->ic + inst_length))
+    if (!check_ic_limit(memory->ic + inst_length))
         return FALSE;
 
     memory->ic += inst_length;
@@ -61,44 +47,44 @@ static int process_instruction_line(char **tokens, int token_count, SymbolTable 
     return TRUE;
 }
 
-static int process_directive_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory) {
-    int directive_index, has_label;
+static int process_directive_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
+    int direct_index, has_label;
 
     has_label = has_label_in_tokens(tokens, token_count);
     
     if (has_label) {
-        if (!process_label(tokens[0], symbol_table, memory->dc, TRUE))
+        if (!process_label(tokens[0], symtab, memory->dc, TRUE))
             return FALSE;
 
-        directive_index = 1;
+        direct_index = 1;
     } else
-        directive_index = 0;
+        direct_index = 0;
     
-    return process_directive(tokens + directive_index, token_count - directive_index, symbol_table, memory, FALSE);
+    return process_directive(tokens + direct_index, token_count - direct_index, symtab, memory, FALSE);
 }
 
-static void update_data_symbols(SymbolTable *symbol_table, int final_ic) {
+static void update_data_symbols(SymbolTable *symtab, int final_ic) {
     int i;
     
-    for (i = 0; i < symbol_table->count; i++) {
-        if (symbol_table->symbols[i].type == DATA_SYMBOL)
-            symbol_table->symbols[i].value += IC_START + final_ic;
+    for (i = 0; i < symtab->count; i++) {
+        if (symtab->symbols[i].type == DATA_SYMBOL)
+            symtab->symbols[i].value += IC_START + final_ic;
     }
 }
 
-static int process_line(char **tokens, int token_count, SymbolTable *symbol_table, MemoryImage *memory, int line_num) {
-    if (!validate_line_format(tokens, token_count)) {
+static int process_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int line_num) {
+    if (!check_line_format(tokens, token_count)) {
         print_line_error("Invalid line format", NULL, line_num);
         return FALSE;
     }
 
     if (is_directive_line(tokens, token_count)) {
-        if (!process_directive_line(tokens, token_count, symbol_table, memory)) {
+        if (!process_directive_line(tokens, token_count, symtab, memory)) {
             print_line_error("Directive error", NULL, line_num);
             return FALSE;
         }
     } else { /* Must be instruction line */
-        if (!process_instruction_line(tokens, token_count, symbol_table, memory)) {
+        if (!process_instruction_line(tokens, token_count, symtab, memory)) {
             print_line_error("Instruction error", NULL, line_num);
             return FALSE;
         }
@@ -106,7 +92,7 @@ static int process_line(char **tokens, int token_count, SymbolTable *symbol_tabl
     return TRUE;
 }
 
-static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *memory) {
+static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory) {
     char line[MAX_LINE_LENGTH];
     char **tokens = NULL;
     int token_count = 0, line_num = 0, error_flag = 0;
@@ -125,7 +111,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
             continue;
         }
 
-        if (!process_line(tokens, token_count, symbol_table, memory, line_num))
+        if (!process_line(tokens, token_count, symtab, memory, line_num))
             error_flag = 1;
 
         free_tokens(tokens, token_count);
@@ -135,7 +121,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symbol_table, MemoryImage *
 
 /* Outer regular methods */
 /* ==================================================================== */
-int first_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *memory) {
+int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory) {
     FILE *fp = NULL;
 
     fp = open_source_file(filename);
@@ -145,12 +131,14 @@ int first_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *mem
         return PASS_ERROR;
     }
 
-    if (!process_file_lines(fp, symbol_table, memory)) {
+    if (!process_file_lines(fp, symtab, memory)) {
         safe_fclose(&fp);
         return PASS_ERROR;
     }
     safe_fclose(&fp);
-    update_data_symbols(symbol_table, memory->ic);
+    update_data_symbols(symtab, memory->ic);
+
+    printf("%s: IC = %d, DC = %d\n", filename, memory->ic, memory->dc);
 
     return TRUE;
 }

@@ -16,7 +16,7 @@ void init_memory(MemoryImage *memory) {
     }
 }
 
-int validate_ic_limit(int current_ic) {
+int check_ic_limit(int current_ic) {
     if (current_ic >= MAX_IC_SIZE) {
         print_error("IC memory overflow", "Exceeded instruction words limit");
         return FALSE;
@@ -24,7 +24,7 @@ int validate_ic_limit(int current_ic) {
     return TRUE;
 }
 
-int validate_dc_limit(int current_dc) {
+int check_dc_limit(int current_dc) {
     if (current_dc >= MAX_DC_SIZE) {
         print_error("DC memory overflow", "Exceeded data words limit");
         return FALSE;
@@ -34,7 +34,7 @@ int validate_dc_limit(int current_dc) {
 
 /* Store a 10-bit signed value in the data segment */
 int store_value(MemoryImage *memory, int value) {
-    if (!validate_dc_limit(memory->dc))
+    if (!check_dc_limit(memory->dc))
         return FALSE;
 
     /* Store the data word at the current data counter index */

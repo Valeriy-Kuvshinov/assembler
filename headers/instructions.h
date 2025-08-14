@@ -34,6 +34,8 @@ typedef struct {
 
 const Instruction* get_instruction(const char *name);
 
+int get_addressing_mode(const char *operand);
+
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count);
 
 /* Validation macros */

@@ -12,7 +12,7 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int validate_number(const char *token, int *value) {
+static int check_number(const char *token, int *value) {
     char *endptr;
     
     *value = strtol(token, &endptr, BASE10_ENCODING);
@@ -24,7 +24,7 @@ static int validate_number(const char *token, int *value) {
     return TRUE;
 }
 
-static int validate_string(const char *str) {
+static int check_string(const char *str) {
     size_t length;
 
     length = strlen(str);
@@ -38,15 +38,15 @@ static int validate_string(const char *str) {
 
 static int process_data_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     int i, value;
-    int start_idx = 0;
+    int start_index = 0;
 
-    if (token_count <= start_idx + 1) {
+    if (token_count <= start_index + 1) {
         print_error("Invalid .data directive: need at least one numeric value", NULL);
         return FALSE;
     }
 
-    for (i = start_idx + 1; i < token_count; i++) {
-        if (!validate_number(tokens[i], &value))
+    for (i = start_index + 1; i < token_count; i++) {
+        if (!check_number(tokens[i], &value))
             return FALSE;
 
         if (!store_value(memory, value))
@@ -58,17 +58,17 @@ static int process_data_directive(char **tokens, int token_count, SymbolTable *s
 static int process_string_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *str;
     int i; 
-    int start_idx = 0;
+    int start_index = 0;
     size_t length;
 
-    if (token_count != start_idx + 2) {
+    if (token_count != start_index + 2) {
         print_error("Invalid .string directive: need exactly one string literal", NULL);
         return FALSE;
     }
 
-    str = tokens[start_idx + 1];
+    str = tokens[start_index + 1];
 
-    if (!validate_string(str))
+    if (!check_string(str))
         return FALSE;
 
     length = strlen(str);
@@ -100,28 +100,28 @@ static int parse_matrix_dimensions(const char *matrix_def, int *rows, int *cols)
 static int process_mat_directive(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory) {
     char *matrix_def;
     int rows, cols, i, value;
-    int start_idx = 0;
+    int start_index = 0;
 
-    if (token_count <= start_idx + 2) {
+    if (token_count <= start_index + 2) {
         print_error("Invalid .mat directive: need dimensions and at least one numeric value", NULL);
         return FALSE;
     }
 
-    matrix_def = tokens[start_idx + 1];
+    matrix_def = tokens[start_index + 1];
 
     if (!parse_matrix_dimensions(matrix_def, &rows, &cols))
         return FALSE;
     
-    if (token_count != start_idx + 2 + (rows * cols)) {
+    if (token_count != start_index + 2 + (rows * cols)) {
         print_error("Matrix dimensions don't match the number of provided values", NULL);
         return FALSE;
     }
 
     /* Store values */
     for (i = 0; i < rows * cols; i++) {
-        int token_index = start_idx + 2 + i;
+        int token_index = start_index + 2 + i;
 
-        if (!validate_number(tokens[token_index], &value))
+        if (!check_number(tokens[token_index], &value))
             return FALSE;
 
         if (!store_value(memory, value))
@@ -148,13 +148,13 @@ static int process_entry_directive(char **tokens, int token_count, SymbolTable *
 }
 
 static int process_extern_directive(char **tokens, int token_count, SymbolTable *symtab) {
-    int start_idx = 0;
+    int start_index = 0;
 
-    if (token_count != start_idx + 2) {
+    if (token_count != start_index + 2) {
         print_error("Invalid .extern directive: need exactly one label", NULL);
         return FALSE;
     }
-    return add_symbol(symtab, tokens[start_idx + 1], 0, EXTERNAL_SYMBOL);
+    return add_symbol(symtab, tokens[start_index + 1], 0, EXTERNAL_SYMBOL);
 }
 
 /* Outer regular methods */

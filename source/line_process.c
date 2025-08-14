@@ -33,7 +33,7 @@ int is_instruction_line(char **tokens, int token_count) {
     return FALSE;
 }
 
-int validate_line_format(char **tokens, int token_count) {
+int check_line_format(char **tokens, int token_count) {
     int has_label = has_label_in_tokens(tokens, token_count);
     int has_directive = is_directive_line(tokens, token_count);
     int has_instruction = is_instruction_line(tokens, token_count);

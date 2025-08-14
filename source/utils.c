@@ -35,7 +35,7 @@ int bounded_string_copy(char *dest, const char *src, size_t dest_size, const cha
         dest[dest_size - 1] = NULL_TERMINATOR;
 
         if (context)
-            fprintf(stderr, "Warning: String truncated in %s%c", context, NEWLINE);
+            printf("Warning: String truncated in %s%c", context, NEWLINE);
 
         return FALSE;
     }
@@ -86,23 +86,27 @@ int has_label_in_tokens(char **tokens, int token_count) {
 
 void print_error(const char *message, const char *context) {
     if (context)
-        fprintf(stderr, "Error: %s (%s)%c", message, context, NEWLINE);
+        printf("Error: %s (%s)%c", message, context, NEWLINE);
     else
-        fprintf(stderr, "Error: %s%c", message, NEWLINE);
+        printf("Error: %s%c", message, NEWLINE);
 }
 
 void print_line_error(const char *message, const char *context, int line_num) {
     if (context)
-        fprintf(stderr, "Error: %s (%s) at line %d%c", message, context, line_num, NEWLINE);
+        printf("Error: %s (%s) at line %d%c", message, context, line_num, NEWLINE);
     else
-        fprintf(stderr, "Error: %s at line %d%c", message, line_num, NEWLINE);
+        printf("Error: %s at line %d%c", message, line_num, NEWLINE);
 }
 
 void print_line_warning(const char *message, const char *context, int line_num) {
     if (context)
-        fprintf(stderr, "Warning: %s (%s) at line %d%c", message, context, line_num, NEWLINE);
+        printf("Warning: %s (%s) at line %d%c", message, context, line_num, NEWLINE);
     else
-        fprintf(stderr, "Warning: %s at line %d%c", message, line_num, NEWLINE);
+        printf("Warning: %s at line %d%c", message, line_num, NEWLINE);
+}
+
+void write_file_line(FILE *fp, const char *part1, const char *part2) {
+    fprintf(fp, "%s %s%c", part1, part2, NEWLINE);
 }
 
 void safe_free(void **ptr) {

@@ -24,12 +24,12 @@ FILE *open_source_file(const char *filename);
 
 FILE *open_output_file(const char *filename);
 
-int preprocess_macros(const char* src_filename, const char* am_filename, MacroTable *macro_table);
+int preprocess_macros(const char* src_filename, const char* am_filename, MacroTable *macrotab);
 
-int first_pass(const char *filename, SymbolTable *symbol_table, MemoryImage *memory);
+int first_pass(const char *filename, SymbolTable *symtab, MemoryImage *memory);
 
 int second_pass(
-    const char *filename, SymbolTable *symbol_table, MemoryImage *memory,
+    const char *filename, SymbolTable *symtab, MemoryImage *memory,
     const char *obj_file, const char *ent_file, const char *ext_file
 );
 

@@ -12,19 +12,19 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
-static int resize_symbol_table(SymbolTable *symtab) {
+static int resize_symbol_table(SymbolTable *table) {
     int new_capacity;
     Symbol *new_symbols;
 
-    new_capacity = (symtab->capacity == 0) ? INITIAL_SYMBOLS_CAPACITY : symtab->capacity * 2;
-    new_symbols = realloc(symtab->symbols, new_capacity * sizeof(Symbol));
+    new_capacity = (table->capacity == 0) ? INITIAL_SYMBOLS_CAPACITY : table->capacity * 2;
+    new_symbols = realloc(table->symbols, new_capacity * sizeof(Symbol));
 
     if (!new_symbols) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to resize symbol table");
         return FALSE;
     }
-    symtab->symbols = new_symbols;
-    symtab->capacity = new_capacity;
+    table->symbols = new_symbols;
+    table->capacity = new_capacity;
 
     return TRUE;
 }
@@ -87,19 +87,19 @@ static int is_reserved_word(const char *label) {
     return FALSE;
 }
 
-static void store_symbol(SymbolTable *symtab, const char *name, int value, int type) {
+static void store_symbol(SymbolTable *table, const char *name, int value, int type) {
     char *dest_name;
 
-    dest_name = symtab->symbols[symtab->count].name;
+    dest_name = table->symbols[table->count].name;
     bounded_string_copy(dest_name, name, MAX_LABEL_NAME_LENGTH, "symbol name storage");
 
-    symtab->symbols[symtab->count].name[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
-    symtab->symbols[symtab->count].value = value;
-    symtab->symbols[symtab->count].type = type;
-    symtab->symbols[symtab->count].is_entry = (type == ENTRY_SYMBOL);
-    symtab->symbols[symtab->count].is_extern = (type == EXTERNAL_SYMBOL);
+    table->symbols[table->count].name[MAX_LABEL_NAME_LENGTH - 1] = NULL_TERMINATOR;
+    table->symbols[table->count].value = value;
+    table->symbols[table->count].type = type;
+    table->symbols[table->count].is_entry = (type == ENTRY_SYMBOL);
+    table->symbols[table->count].is_extern = (type == EXTERNAL_SYMBOL);
 
-    symtab->count++;
+    table->count++;
 }
 
 static int check_symbol_conflict(const Symbol *existing_symbol, int new_type, const char *name) {
@@ -118,24 +118,24 @@ static int check_symbol_conflict(const Symbol *existing_symbol, int new_type, co
 
 /* Outer regular methods */
 /* ==================================================================== */
-int init_symbol_table(SymbolTable *symtab) {
-    symtab->symbols = malloc(INITIAL_SYMBOLS_CAPACITY * sizeof(Symbol));
+int init_symbol_table(SymbolTable *table) {
+    table->symbols = malloc(INITIAL_SYMBOLS_CAPACITY * sizeof(Symbol));
 
-    if (!symtab->symbols) {
+    if (!table->symbols) {
         print_error(ERR_MEMORY_ALLOCATION, "Failed to initialize symbol table");
         return FALSE;
     }
-    symtab->count = 0;
-    symtab->capacity = INITIAL_SYMBOLS_CAPACITY;
+    table->count = 0;
+    table->capacity = INITIAL_SYMBOLS_CAPACITY;
 
     return TRUE;
 }
 
-void free_symbol_table(SymbolTable *symtab) {
-    safe_free((void**)&symtab->symbols);
+void free_symbol_table(SymbolTable *table) {
+    safe_free((void**)&table->symbols);
 
-    symtab->count = 0;
-    symtab->capacity = 0;
+    table->count = 0;
+    table->capacity = 0;
 }
 
 void extract_text_from_label(char *label) {
@@ -145,60 +145,60 @@ void extract_text_from_label(char *label) {
         *colon = NULL_TERMINATOR; /* Remove the colon */
 }
 
-Symbol* find_symbol(SymbolTable *symtab, const char *name) {
+Symbol* find_symbol(SymbolTable *table, const char *name) {
     int i;
 
-    if (!symtab || !symtab->symbols || !name)
+    if (!table || !table->symbols || !name)
         return NULL;
 
-    for (i = 0; i < symtab->count; i++) {
-        if (strcmp(symtab->symbols[i].name, name) == 0)
-            return &symtab->symbols[i];
+    for (i = 0; i < table->count; i++) {
+        if (strcmp(table->symbols[i].name, name) == 0)
+            return &table->symbols[i];
     }
     return NULL;
 }
 
-int add_symbol(SymbolTable *symtab, const char *name, int value, int type) {
+int add_symbol(SymbolTable *table, const char *name, int value, int type) {
     Symbol *existing_symbol;
 
-    if (!symtab) {
+    if (!table) {
         print_error("Symbol table not initialized", NULL);
         return FALSE;
     }
-    existing_symbol = find_symbol(symtab, name);
+    existing_symbol = find_symbol(table, name);
 
     if (check_symbol_conflict(existing_symbol, type, name))
         return FALSE;
 
-    if (symtab->count >= symtab->capacity && !resize_symbol_table(symtab))
+    if (table->count >= table->capacity && !resize_symbol_table(table))
         return FALSE;
 
-    store_symbol(symtab, name, value, type);
+    store_symbol(table, name, value, type);
 
     return TRUE;
 }
 
-int has_entries(const SymbolTable *symtab) {
+int has_entries(const SymbolTable *table) {
     int i;
 
-    if (!symtab || !symtab->symbols)
+    if (!table || !table->symbols)
         return FALSE;
 
-    for (i = 0; i < symtab->count; i++) {
-        if (symtab->symbols[i].is_entry) 
+    for (i = 0; i < table->count; i++) {
+        if (table->symbols[i].is_entry) 
             return TRUE;
     }
     return FALSE;
 }
 
-int has_externs(const SymbolTable *symtab) {
+int has_externs(const SymbolTable *table) {
     int i;
 
-    if (!symtab || !symtab->symbols)
+    if (!table || !table->symbols)
         return FALSE;
 
-    for (i = 0; i < symtab->count; i++) {
-        if (symtab->symbols[i].type == EXTERNAL_SYMBOL) 
+    for (i = 0; i < table->count; i++) {
+        if (table->symbols[i].type == EXTERNAL_SYMBOL) 
             return TRUE;
     }
     return FALSE;
@@ -219,7 +219,7 @@ int is_valid_label(char *label) {
     return TRUE;
 }
 
-int process_label(char *label, SymbolTable *symtab, int address, int is_data) {
+int process_label(char *label, SymbolTable *table, int address, int is_data) {
     extract_text_from_label(label);
-    return add_symbol(symtab, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
+    return add_symbol(table, label, address, is_data ? DATA_SYMBOL : CODE_SYMBOL);
 }
