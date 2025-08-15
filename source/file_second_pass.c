@@ -67,18 +67,15 @@ static int process_directive_line(char **tokens, int token_count, SymbolTable *s
 }
 
 static int process_line(char **tokens, int token_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, int line_num) {
-    if (!check_line_format(tokens, token_count)) {
-        print_line_error("Invalid line format", NULL, line_num);
+    if (!check_line_format(tokens, token_count, line_num))
         return FALSE;
-    }
 
     if (is_directive_line(tokens, token_count)) {
-        if (!process_directive_line(tokens, token_count, symtab, memory, line_num)) {
+        if (!process_directive_line(tokens, token_count, symtab, memory, line_num))
             return FALSE;
-        }
-    } else if (!process_instruction_line(tokens, token_count, symtab, memory, current_ic_ptr, line_num)) {
+    } else if (!process_instruction_line(tokens, token_count, symtab, memory, current_ic_ptr, line_num))
         return FALSE;
-    }
+
     return TRUE;
 }
 
@@ -92,7 +89,7 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
 
         if (!parse_tokens(line, &tokens, &token_count)) {
             print_line_error("Syntax error", NULL, line_num);
-            error_flag = 1;
+            error_flag = TRUE;
             continue;
         }
 
@@ -101,9 +98,10 @@ static int process_file_lines(FILE *fp, SymbolTable *symtab, MemoryImage *memory
             continue;
         }
 
-        if (!process_line(tokens, token_count, symtab, memory, &second_pass_ic, line_num))
-            error_flag = 1;
-
+        if (!process_line(tokens, token_count, symtab, memory, &second_pass_ic, line_num)) {
+            print_line_error("Detected issue while processing line", NULL, line_num);
+            error_flag = TRUE;
+        }
         free_tokens(tokens, token_count);
     }
     return (error_flag ? FALSE : TRUE);

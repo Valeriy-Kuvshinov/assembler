@@ -254,10 +254,12 @@ int is_macro_call(const char *line, const MacroTable *table) {
     strcpy(trimmed, line);
     trim_whitespace(trimmed);
 
-    /* Handle labels: "LABEL: macro_name" */
     colon_pos = strchr(trimmed, LABEL_TERMINATOR);
 
     if (colon_pos) {
+        if (!isspace(*(colon_pos + 1)))
+            return FALSE;
+
         macro_part = colon_pos + 1;
 
         while (isspace(*macro_part)) {

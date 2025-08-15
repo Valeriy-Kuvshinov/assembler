@@ -30,57 +30,59 @@ static int check_line_length(const char *line, FILE *fp, int line_num) {
         line[MAX_LINE_LENGTH - 2] != NEWLINE) {
         print_line_error("Line over 80 characters", NULL, line_num);
 
-        /* Consume the rest of the oversized line to sync the file pointer */
-        while (((character = fgetc(fp)) != NEWLINE) && (character != EOF));
-
+        while (((character = fgetc(fp)) != NEWLINE) && (character != EOF)){
+            /* Consume the rest of the oversized line to sync the file pointer */
+        }
         return FALSE;
     }
     return TRUE;
 }
 
-static char* extract_macro_name_after_label(char *buffer) {
+static char *extract_macro_name(const char *line) {
+    static char temp_buffer[MAX_LINE_LENGTH];
     char *macro_name_start, *colon_pos;
     size_t length;
 
-    colon_pos = strchr(buffer, LABEL_TERMINATOR);
+    strcpy(temp_buffer, line);
+    colon_pos = strchr(temp_buffer, LABEL_TERMINATOR);
 
-    if (!colon_pos)
-        return NULL;
+    if (colon_pos) {
+        /* Handle both cases: "LABEL: macro" and "LABEL:macro" */
+        macro_name_start = colon_pos + 1;
 
-    macro_name_start = colon_pos + 1;
+        while (isspace(*macro_name_start)) {
+            macro_name_start++;
+        }
+        if (*macro_name_start == NULL_TERMINATOR)
+            return NULL;
 
-    while (isspace(*macro_name_start)) {
-        macro_name_start++;
-    }
-
-    if (*macro_name_start == NULL_TERMINATOR)
-        return NULL;
-
-    length = strlen(macro_name_start) + 1;
-    memmove(buffer, macro_name_start, length);
-    trim_whitespace(buffer);
-
-    return (is_empty_line(buffer) ? NULL : buffer);
-}
-
-static char *extract_macro_name(const char *line) {
-    static char temp_buffer[MAX_LINE_LENGTH];
-
-    if (!bounded_string_copy(temp_buffer, line, sizeof(temp_buffer), "extract macro name"))
-        return NULL;
-
-    if (strchr(temp_buffer, LABEL_TERMINATOR))
-        return extract_macro_name_after_label(temp_buffer);
-    else {
-        /* Handle lines without a label */
+        length = strlen(macro_name_start) + 1;
+        memmove(temp_buffer, macro_name_start, length);
         trim_whitespace(temp_buffer);
-        return (is_empty_line(temp_buffer) ? NULL : temp_buffer);
+
+        if (is_empty_line(temp_buffer))
+            return NULL;
+
+        return temp_buffer;
+    } else {
+        /* No label, the whole line is the macro name. */
+        trim_whitespace(temp_buffer);
+
+        if (is_empty_line(temp_buffer))
+            return NULL;
+
+        return temp_buffer;
     }
 }
 
 static int process_macro_definition(char *line, MacroTable *macrotab, Macro **current_macro, int line_num) {
     char *name;
     size_t length;
+
+    if (strchr(line, LABEL_TERMINATOR)) {
+        print_line_error("Label not allowed before 'mcro' definition", NULL, line_num);
+        return FALSE;
+    }
 
     length = strlen(MACRO_START);
     name = strtok(line + length, SPACE_TAB);
@@ -106,7 +108,11 @@ static int process_macro_definition(char *line, MacroTable *macrotab, Macro **cu
 static void process_macro_body(const char *original_line, Macro *current_macro, int line_num) {
     char clean_line[MAX_LINE_LENGTH];
 
-    bounded_string_copy(clean_line, original_line, sizeof(clean_line), "macro body processing");
+    if (strchr(original_line, LABEL_TERMINATOR)) {
+        print_line_error("Label not allowed inside a macro", NULL, line_num);
+        return;
+    }
+    strcpy(clean_line, original_line);
     preprocess_line(clean_line);
 
     if (!add_line_to_macro(current_macro, clean_line))
@@ -158,9 +164,13 @@ static int process_macro_call_line(const char *line, FILE *am, const MacroTable 
 }
 
 static int handle_in_macro_definition(const char *original_line, const char *processed_line, Macro *current_macro, int *in_macro_definition, int line_num) {
-    if (IS_MACRO_END(processed_line))
+    if (IS_MACRO_END(processed_line)) {
+        if (strchr(original_line, LABEL_TERMINATOR)) {
+            print_line_error("Label not allowed before 'mcroend'", NULL, line_num);
+            return FALSE;
+        }
         *in_macro_definition = FALSE;
-    else
+    } else
         process_macro_body(original_line, current_macro, line_num);
 
     return TRUE;
@@ -170,14 +180,14 @@ static int handle_outside_macro_definition(const char *original_line, const char
     char temp_line[MAX_LINE_LENGTH];
 
     if (IS_MACRO_DEFINITION(processed_line)) {
-        bounded_string_copy(temp_line, processed_line, sizeof(temp_line), "macro definition");
+        strcpy(temp_line, processed_line);
         *in_macro_definition = process_macro_definition(temp_line, macrotab, current_macro, line_num);
         return *in_macro_definition;
     }
 
     if (is_macro_call(processed_line, macrotab))
         return process_macro_call_line(original_line, am_fp, macrotab, line_num);
-    
+
     fprintf(am_fp, "%s", original_line);
     return TRUE;
 }
@@ -205,15 +215,15 @@ static int process_file_lines(FILE *src_fp, FILE *am_fp, MacroTable *macrotab) {
             has_error = TRUE;
             continue;
         }
-
-        bounded_string_copy(original_line, line, sizeof(original_line), "line processing");
-        bounded_string_copy(processed_line, line, sizeof(processed_line), "line processing");
+        strcpy(original_line, line);
+        strcpy(processed_line, line);
         preprocess_line(processed_line);
 
-        if (!process_line(original_line, processed_line, am_fp, macrotab, &current_macro, &in_macro_definition, line_num))
+        if (!process_line(original_line, processed_line, am_fp, macrotab, &current_macro, &in_macro_definition, line_num)) {
+            print_line_error("Detected issue while processing line", NULL, line_num);
             has_error = TRUE;
+        }
     }
-
     if (in_macro_definition) {
         print_error("Macro not closed with 'mcroend'", NULL);
         has_error = TRUE;

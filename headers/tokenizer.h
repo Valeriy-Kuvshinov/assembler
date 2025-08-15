@@ -6,15 +6,16 @@
 
 /* Structure to hold parsing state */
 typedef struct {
-    char *current_token;       /* Buffer for current token being built */
-    char **tokens;             /* Array of completed tokens */
-    int in_token;              /* Flag indicating if building a token */
-    int char_index;            /* Position in current_token */
-    int token_index;           /* Position in tokens array */
-    int current_token_size;    /* Allocated size of current_token */
-    int tokens_capacity;       /* Allocated capacity of tokens array */
-    int prev_was_comma;        /* Flag for comma validation */
-    int *token_count;          /* Pointer to final token count */
+    char *current_token;       /* buffer for current token being built */
+    char **tokens;             /* array of completed tokens */
+    int in_token;              /* flag indicating if building a token */
+    int char_index;            /* position in current_token */
+    int token_index;           /* position in tokens array */
+    int current_token_size;    /* allocated size of current_token */
+    int tokens_capacity;       /* allocated capacity of tokens array */
+    int prev_was_comma;        /* flag for comma validation */
+    int *token_count;          /* pointer to final token count */
+    int in_string;             /* flag to prevent accidental string breakup */
 } ParseState;
 
 /* Function prototypes */

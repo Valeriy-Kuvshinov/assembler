@@ -29,7 +29,7 @@ static int check_string(const char *str) {
 
     length = strlen(str);
 
-    if (length < 2 || str[0] != QUOTATION_CHAR || str[length - 1] != QUOTATION_CHAR) {
+    if (str[0] != QUOTATION_CHAR || str[length - 1] != QUOTATION_CHAR) {
         print_error("String literal must be enclosed in double quotes", str);
         return FALSE;
     }

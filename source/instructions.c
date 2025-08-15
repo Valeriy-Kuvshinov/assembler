@@ -80,7 +80,7 @@ static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
 
 static int check_operand_count(const Instruction *inst, int operand_count) {
     if (operand_count != inst->num_operands) {
-        printf("Invalid operand amount for instruction (%d / %d)", inst->num_operands, operand_count);
+        printf("Invalid instruction operands amount (%d / %d)%c", inst->num_operands, operand_count, NEWLINE);
         return FALSE;
     }
     return TRUE;
@@ -137,7 +137,7 @@ int get_addressing_mode(const char *operand) {
 
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
     int i, mode;
-    int length = 1;  /* Base instruction word */
+    int length = 1;
 
     if (!inst || !operands)
         return -1;

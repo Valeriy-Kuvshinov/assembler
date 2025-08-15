@@ -92,11 +92,32 @@ static int handle_character(ParseState *state, char cha) {
     return TRUE;
 }
 
+static int handle_quote(ParseState *state) {
+    if (!handle_character(state, QUOTATION_CHAR))
+        return FALSE;
+
+    state->in_string = !state->in_string;
+
+    if (!state->in_string)
+        return finalize_token(state);
+
+    return TRUE;
+}
+
 static int process_character(ParseState *state, char cha) {
+    if (state->in_string) {
+        if (cha == QUOTATION_CHAR)
+            return handle_quote(state);
+
+        return handle_character(state, cha);
+    }
+
     if (isspace(cha))
         return finalize_if_in_token(state);
     else if (cha == COMMA_CHAR)
         return handle_comma(state);
+    else if (cha == QUOTATION_CHAR)
+        return handle_quote(state);
     else
         return handle_character(state, cha);
 }
@@ -108,6 +129,7 @@ static int init_parsing(ParseState *state, int *token_count_ptr) {
     state->current_token_size = INITIAL_TOKEN_SIZE;
     state->tokens_capacity = INITIAL_TOKENS_CAPACITY;
     state->prev_was_comma = 0;
+    state->in_string = 0;
     state->token_count = token_count_ptr;
     *state->token_count = 0;
 

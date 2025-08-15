@@ -75,10 +75,6 @@ void preprocess_line(char *line) {
     trim_whitespace(line);
 }
 
-int should_skip_line(const char *line) {
-    return (line[0] == NULL_TERMINATOR || line[0] == COMMENT_CHAR);
-}
-
 int has_label_in_tokens(char **tokens, int token_count) {
     /* Only check first token for label */
     return (token_count > 0 && strchr(tokens[0], LABEL_TERMINATOR));

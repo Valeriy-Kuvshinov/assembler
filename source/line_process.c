@@ -33,21 +33,23 @@ int is_instruction_line(char **tokens, int token_count) {
     return FALSE;
 }
 
-int check_line_format(char **tokens, int token_count) {
+int check_line_format(char **tokens, int token_count, int line_num) {
     int has_label = has_label_in_tokens(tokens, token_count);
     int has_directive = is_directive_line(tokens, token_count);
     int has_instruction = is_instruction_line(tokens, token_count);
-    
-    /* Rule: Cannot have both directive and instruction on same line */
+
     if (has_directive && has_instruction) {
-        print_error("Conflict from directive and instruction on the same line", NULL);
+        print_line_error("Conflict: directive and instruction on same line", NULL, line_num);
         return FALSE;
     }
-    
-    /* Rule: Cannot have label alone, must have either directive or instruction */
-    if ((has_label && (token_count == 1)) ||
-        (!has_directive && !has_instruction)) {
-        print_error("Label must have data directive / instruction after it", NULL);
+
+    if (has_label && token_count == 1) {
+        print_line_error("Label must have directive / instruction after it", tokens[0], line_num);
+        return FALSE;
+    }
+
+    if (!has_directive && !has_instruction) {
+        print_line_error("Line must contain directive / instruction", NULL, line_num);
         return FALSE;
     }
     return TRUE;
