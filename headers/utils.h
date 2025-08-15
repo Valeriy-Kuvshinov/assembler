@@ -40,8 +40,6 @@ void remove_comments(char *line);
 
 void preprocess_line(char *line);
 
-int has_label_in_tokens(char **tokens, int token_count);
-
 void print_error(const char *message, const char *context);
 
 void print_line_error(const char *message, const char *context, int line_num);

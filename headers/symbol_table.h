@@ -31,8 +31,6 @@ int init_symbol_table(SymbolTable *table);
 
 void free_symbol_table(SymbolTable *table);
 
-void extract_text_from_label(char *label);
-
 Symbol* find_symbol(SymbolTable *table, const char *name);
 
 int add_symbol(SymbolTable *table, const char *name, int value, int type);
@@ -43,7 +41,11 @@ int has_externs(const SymbolTable *table);
 
 int is_valid_label(char *label);
 
+int is_first_token_label(char **tokens, int token_count);
+
 int process_label(char *label, SymbolTable *table, int address, int symbol_type);
+
+void update_data_symbols(SymbolTable *symtab, int final_ic);
 
 /* Validation macros */
 

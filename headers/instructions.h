@@ -24,7 +24,7 @@
 
 typedef struct {
     const char *name;
-    int opcode;
+    int opcode;                 /* numeric instruction / operation code */
     int num_operands;           /* TWO_OPERANDS / ONE_OPERAND / NO_OPERANDS */
     int legal_src_addr_modes;   /* address mode for source operand */
     int legal_dest_addr_modes;  /* address mode for destination operand */

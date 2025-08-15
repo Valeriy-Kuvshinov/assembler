@@ -7,8 +7,14 @@
 #include "memory.h"
 #include "instructions.h"
 
+/*
+Complete instruction collection for the assembler.
+Instruction Groups:
+  I. Two-operand (mov, cmp, add, sub, lea)
+  II. One-operand (clr, not, inc, dec, jmp, bne, jsr, red, prn)
+  III. Zero-operand (rts, stop)
+*/
 static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
-  /* group I: 2 operands */
   {
     "mov", 0, TWO_OPERANDS,
     ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER,
@@ -34,8 +40,6 @@ static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
     ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX,
     ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
   },
-
-  /* group II: 1 operand */
   {
     "clr", 5, ONE_OPERAND, 0,
     ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
@@ -72,12 +76,18 @@ static const Instruction instruction_set[INSTRUCTIONS_COUNT] = {
     "prn", 13, ONE_OPERAND, 0,
     ADDR_FLAG_IMMEDIATE | ADDR_FLAG_DIRECT | ADDR_FLAG_MATRIX | ADDR_FLAG_REGISTER
   },
-
-  /* group III: 0 operands */
   {"rts", 14, NO_OPERANDS, 0, 0},
   {"stop", 15, NO_OPERANDS, 0, 0}
 };
 
+/* Inner STATIC methods */
+/* ==================================================================== */
+/*
+Function to verify operand count matches instruction requirements.
+Receives: const Instruction *inst - Instruction to check
+          int operand_count - Actual number of operands
+Returns: int - TRUE if count matches, FALSE otherwise
+*/
 static int check_operand_count(const Instruction *inst, int operand_count) {
     if (operand_count != inst->num_operands) {
         printf("Invalid instruction operands amount (%d / %d)%c", inst->num_operands, operand_count, NEWLINE);
@@ -86,6 +96,12 @@ static int check_operand_count(const Instruction *inst, int operand_count) {
     return TRUE;
 }
 
+/*
+Function to validate instruction doesn't exceed maximum word limit.
+Receives: const Instruction *inst - Instruction to check
+          int length - Proposed instruction length
+Returns: int - TRUE if within limit (MAX_INSTRUCTION_WORDS), FALSE otherwise
+*/
 static int check_instruction_limit(const Instruction *inst, int length) {
     if (length > MAX_INSTRUCTION_WORDS) {
         print_error("Instruction exceeds the 5-word limit", inst->name);
@@ -94,6 +110,14 @@ static int check_instruction_limit(const Instruction *inst, int length) {
     return TRUE;
 }
 
+/*
+Function to check memory cost for an addressing mode.
+Receives: int addressing_mode - Mode to evaluate
+Returns: int - Additional words required:
+          0: Invalid mode
+          1: Immediate/Direct/Register
+          2: Matrix
+*/
 static int get_operand_word_cost(int addressing_mode) {
     switch (addressing_mode) {
         case ADDR_MODE_IMMEDIATE:
@@ -109,6 +133,13 @@ static int get_operand_word_cost(int addressing_mode) {
     }
 }
 
+/* Outer methods */
+/* ==================================================================== */
+/*
+Function to find an instruction by name (case-sensitive).
+Receives: const char *name - string to search for
+Returns: const Instruction* - Pointer to instruction struct, NULL if not found
+*/
 const Instruction* get_instruction(const char *name) {
     int i;
 
@@ -119,6 +150,11 @@ const Instruction* get_instruction(const char *name) {
     return NULL;
 }
 
+/*
+Function to identify the addressing mode of an operand string.
+Receives: const char *operand - Operand string to analyze
+Returns: int - Addressing mode constant (ADDR_MODE_*) or -1 if invalid/unknown
+*/
 int get_addressing_mode(const char *operand) {
     if (!operand || !*operand) 
         return -1;
@@ -135,6 +171,16 @@ int get_addressing_mode(const char *operand) {
     return ADDR_MODE_DIRECT;
 }
 
+/*
+Function to calculate total words required for an instruction.
+Receives: const Instruction *inst - Instruction definition
+          char **operands - Array of operand strings
+          int operand_count - Number of operands
+Returns: int - Total words required or -1 if:
+               - Invalid operands
+               - Wrong operand count
+               - Exceeds MAX_INSTRUCTION_WORDS
+*/
 int calculate_instruction_length(const Instruction *inst, char **operands, int operand_count) {
     int i, mode;
     int length = 1;
@@ -153,7 +199,6 @@ int calculate_instruction_length(const Instruction *inst, char **operands, int o
         
         length += get_operand_word_cost(mode);
     }
-
     if ((operand_count == 2) &&
         (get_addressing_mode(operands[0]) == ADDR_MODE_REGISTER) &&
         (get_addressing_mode(operands[1]) == ADDR_MODE_REGISTER))

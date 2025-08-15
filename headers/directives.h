@@ -22,13 +22,13 @@ int process_directive(
 /* Validation macros */
 
 #define IS_DATA_DIRECTIVE(token) \
-    (strcmp((token), DATA_DIRECTIVE) == 0 || \
-     strcmp((token), STRING_DIRECTIVE) == 0 || \
-      strcmp((token), MATRIX_DIRECTIVE) == 0)
+    (strcmp((token), DATA_DIRECTIVE) == 0 || strcmp((token), "data") == 0 || \
+     strcmp((token), STRING_DIRECTIVE) == 0 || strcmp((token), "string") == 0 || \
+     strcmp((token), MATRIX_DIRECTIVE) == 0 || strcmp((token), "mat") == 0)
 
 #define IS_LINKER_DIRECTIVE(token) \
-    (strcmp((token), ENTRY_DIRECTIVE) == 0 || \
-     strcmp((token), EXTERN_DIRECTIVE) == 0)
+    (strcmp((token), ENTRY_DIRECTIVE) == 0 || strcmp((token), "entry") == 0 || \
+     strcmp((token), EXTERN_DIRECTIVE) == 0 || strcmp((token), "extern") == 0)
 
 #define IS_DIRECTIVE(token) \
     (IS_DATA_DIRECTIVE(token) || IS_LINKER_DIRECTIVE(token))

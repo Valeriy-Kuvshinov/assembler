@@ -12,13 +12,24 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
+/*
+Function to reset all bits in a memory word to 0.
+Receives: MemoryWord *word - Pointer to memory word to clear
+*/
 static void clear_bits(MemoryWord *word) {
     word->raw = 0;
 }
 
+/*
+Function to skip immediate prefix & encode an immediate operand value.
+Validates range (-128 to 127) and stores in memory word.
+Receives: const char *operand - The operand string starting with '#'
+          MemoryWord *word - Pointer to memory word for storage
+Returns: int - TRUE if encoding succeeded, FALSE on invalid value
+*/
 static int encode_immediate_operand(const char *operand, MemoryWord *word) {
     char *endptr;
-    long value = strtol(operand + 1, &endptr, BASE10_ENCODING); /* Skip '#' */
+    long value = strtol(operand + 1, &endptr, BASE10_ENCODING);
 
     if (*endptr != NULL_TERMINATOR || (value < -128 || value > 127)) {
         print_error("# value must be a decimal integer within the signed range (-128 to 127)", operand);
@@ -30,6 +41,12 @@ static int encode_immediate_operand(const char *operand, MemoryWord *word) {
     return TRUE;
 }
 
+/*
+Function to encode a register operand, validates register number and stores in memory word.
+Receives: const char *operand - The register operand string
+          MemoryWord *word - Pointer to memory word for storage
+Returns: int - TRUE if encoding succeeded, FALSE on invalid register
+*/
 static int encode_register_operand(const char *operand, MemoryWord *word) {
     int reg = operand[1] - '0';
     
@@ -43,6 +60,13 @@ static int encode_register_operand(const char *operand, MemoryWord *word) {
     return TRUE;
 }
 
+/*
+Function to encode a symbol / label operand, handles both external and relocatable symbols.
+Receives: const char *operand - The symbol name
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryWord *word - Pointer to memory word for storage
+Returns: int - TRUE if encoding succeeded, FALSE if symbol not found
+*/
 static int encode_symbol_operand(const char *operand, SymbolTable *symtab, MemoryWord *word) {
     Symbol *sym = find_symbol(symtab, operand);
     
@@ -50,7 +74,6 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symtab, Memor
         print_error("Symbol not found", operand);
         return FALSE;
     }
-
     if (sym->type == EXTERNAL_SYMBOL) {
         word->operand.value = 0;
         word->operand.are = ARE_EXTERNAL;
@@ -63,6 +86,14 @@ static int encode_symbol_operand(const char *operand, SymbolTable *symtab, Memor
     return TRUE;
 }
 
+/*
+Function to extract content between brackets in matrix operand.
+Receives: char *start - String starting at opening bracket
+          char open_bracket - Opening bracket character
+          char close_bracket - Closing bracket character
+          char **out_str - Output pointer to content between brackets
+Returns: char* - Pointer to position after closing bracket
+*/
 static char* extract_matrix_content(char *start, char open_bracket, char close_bracket, char **out_str) {
     char *open_pos, *close_pos;
     
@@ -89,6 +120,13 @@ static char* extract_matrix_content(char *start, char open_bracket, char close_b
     return close_pos + 1;
 }
 
+/*
+Function to extract both register indices from matrix operand.
+Receives: char *temp - Buffer containing matrix operand
+          char **reg1_str - Output for first register string
+          char **reg2_str - Output for second register string
+Returns: int - TRUE if both registers extracted successfully
+*/
 static int extract_matrix_registers(char *temp, char **reg1_str, char **reg2_str) {
     char *pos;
 
@@ -96,14 +134,12 @@ static int extract_matrix_registers(char *temp, char **reg1_str, char **reg2_str
         print_error(ERR_INVALID_MATRIX, "Null pointer in matrix register extraction");
         return FALSE;
     }
-
     pos = extract_matrix_content(temp, LEFT_BRACKET, RIGHT_BRACKET, reg1_str);
 
     if (!pos || !*reg1_str) {
         print_error(ERR_INVALID_MATRIX, "Missing or empty first matrix register");
         return FALSE;
     }
-
     pos = extract_matrix_content(pos, LEFT_BRACKET, RIGHT_BRACKET, reg2_str);
 
     if (!pos || !*reg2_str) {
@@ -113,6 +149,13 @@ static int extract_matrix_registers(char *temp, char **reg1_str, char **reg2_str
     return TRUE;
 }
 
+/*
+Function to parse matrix operand into register numbers, validates register indices.
+Receives: const char *operand - Full matrix operand string
+          int *base_reg - Output for base register index
+          int *index_reg - Output for index register index
+Returns: int - TRUE if parsing succeeded, FALSE otherwise
+*/
 static int parse_matrix_operand(const char *operand, int *base_reg, int *index_reg) {
     char temp[MAX_LINE_LENGTH];
     char *reg1_str, *reg2_str;
@@ -127,7 +170,6 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
         print_error("Invalid register pair", "Matrix indices must be registers (r0-r7)");
         return FALSE;
     }
-
     *base_reg = reg1_str[1] - '0';
     *index_reg = reg2_str[1] - '0';
 
@@ -139,6 +181,14 @@ static int parse_matrix_operand(const char *operand, int *base_reg, int *index_r
     return TRUE;
 }
 
+/*
+Function to encode a matrix operand, uses 2 memory words: 1 for label, 1 for registers.
+Receives: const char *operand - Full matrix operand string
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryWord *word - First memory word for label
+          MemoryWord *next_word - Second memory word for registers
+Returns: int - TRUE if encoding succeeded, FALSE otherwise
+*/
 static int encode_matrix_operand(const char *operand, SymbolTable *symtab, MemoryWord *word, MemoryWord *next_word) {
     char label[MAX_LABEL_NAME_LENGTH];
     char *bracket = strchr(operand, LEFT_BRACKET);
@@ -148,13 +198,11 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symtab, Memor
         print_error(ERR_INVALID_MATRIX, "Matrix addressing requires a second word for registers");
         return FALSE;
     }
-
     /* Extract label part (e.g., "M1" from "M1[r2][r7]") */
     if (!bracket || (bracket - operand >= MAX_LABEL_NAME_LENGTH)) {
         print_error(ERR_INVALID_MATRIX, "Invalid label part in matrix addressing");
         return FALSE;
     }
-
     strncpy(label, operand, bracket - operand);
     label[bracket - operand] = NULL_TERMINATOR;
 
@@ -174,6 +222,16 @@ static int encode_matrix_operand(const char *operand, SymbolTable *symtab, Memor
     return TRUE;
 }
 
+/*
+Function to route to specific encoder based on operand type.
+Handles immediate, register, matrix, and symbol operands.
+Receives: const char *operand - The operand string to encode
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryWord *word - Primary memory word for storage
+          int is_dest - Flag indicating if this is a destination operand
+          MemoryWord *next_word - Secondary memory word (for matrix)
+Returns: int - TRUE if encoding succeeded, FALSE otherwise
+*/
 static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *word, int is_dest, MemoryWord *next_word) {
     clear_bits(word);
     word->operand.ext_symbol_index = -1;
@@ -183,35 +241,38 @@ static int encode_operand(const char *operand, SymbolTable *symtab, MemoryWord *
         next_word->operand.ext_symbol_index = -1;
     }
 
-    /* Immediate value (#num) */
-    if (operand[0] == IMMEDIATE_PREFIX) {
+    if (operand[0] == IMMEDIATE_PREFIX) { /* Immediate value (#num) */
         if (!encode_immediate_operand(operand, word)) 
             return FALSE;
     }
-    /* Register (r0-r7) */
-    else if (IS_REGISTER(operand)) {
+    else if (IS_REGISTER(operand)) { /* Register (r0-r7) */
         if (!encode_register_operand(operand, word)) 
             return FALSE;
     }
-    /* Matrix access (label[rX][rY]) */
-    else if (strchr(operand, LEFT_BRACKET)) {
+    else if (strchr(operand, LEFT_BRACKET)) { /* Matrix access (label[rX][rY]) */
         if (!encode_matrix_operand(operand, symtab, word, next_word)) 
             return FALSE;
     }
-    /* Symbol/label (direct addressing) */
-    else if (!encode_symbol_operand(operand, symtab, word)) 
+    else if (!encode_symbol_operand(operand, symtab, word)) /* Symbol/label (direct addressing) */
         return FALSE;
 
     return TRUE;
 }
 
+/*
+Function to store an operand word in memory at current IC position.
+Increments instruction counter after storage.
+Receives: MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord operand_word - The word to store
+Returns: int - TRUE if storage succeeded, FALSE on IC limit
+*/
 static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWord operand_word) {
     int addr_index;
 
     if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
 
-    /* Store the word at the calculated instruction address */
     addr_index = IC_START + (*current_ic_ptr);
     memory->words[addr_index] = operand_word;
     (*current_ic_ptr)++;
@@ -219,6 +280,15 @@ static int store_operand_word(MemoryImage *memory, int *current_ic_ptr, MemoryWo
     return TRUE;
 }
 
+/*
+Function to store a register value in specific bits of a memory word.
+Used for register-only instructions.
+Receives: MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          int reg_value - Register number to store
+          int shift - Bit position shift (src=6, dest=2)
+Returns: int - TRUE if storage succeeded, FALSE on IC limit
+*/
 static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg_value, int shift) {
     MemoryWord *target_word;
 
@@ -239,6 +309,15 @@ static int store_register_word(MemoryImage *memory, int *current_ic_ptr, int reg
     return TRUE;
 }
 
+/*
+Function to store 2 register values in a single memory word.
+Combine source and destination register values into a single word.
+Receives: MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord src_word - Source register word
+          MemoryWord dest_word - Destination register word
+Returns: int - TRUE if storage succeeded, FALSE on IC limit
+*/
 static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryWord src_word, MemoryWord dest_word) {
     MemoryWord *target_word;
 
@@ -248,7 +327,6 @@ static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryW
     target_word = &memory->words[IC_START + (*current_ic_ptr)];
     clear_bits(target_word);
 
-    /* Combine source and destination register values into a single RegWord */
     target_word->reg.reg_src = src_word.operand.value;
     target_word->reg.reg_dst = dest_word.operand.value;
     target_word->reg.are = ARE_ABSOLUTE;    
@@ -257,24 +335,44 @@ static int store_two_registers(MemoryImage *memory, int *current_ic_ptr, MemoryW
     return TRUE;
 }
 
+/*
+Function to handle final storage of operand based on addressing mode.
+Routes to appropriate storage function (primary word / second word).
+Receives: MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          int mode - Addressing mode (immediate/register/matrix)
+          MemoryWord operand_word - Primary operand word
+          MemoryWord next_word - Secondary word (for matrix)
+          int reg_shift - Bit shift for register storage
+Returns: int - TRUE if storage succeeded, FALSE otherwise
+*/
 static int process_operand_storage(MemoryImage *memory, int *current_ic_ptr, int mode, MemoryWord operand_word, MemoryWord next_word, int reg_shift) {
     if (mode == ADDR_MODE_REGISTER)
         return store_register_word(memory, current_ic_ptr, operand_word.operand.value, reg_shift);
     else {
-        /* Store the primary operand word (immediate, direct, or matrix label) */
         if (!store_operand_word(memory, current_ic_ptr, operand_word))
             return FALSE;
 
-        /* If it's matrix addressing, store the second word (registers) */
         if (mode == ADDR_MODE_MATRIX)
             return store_operand_word(memory, current_ic_ptr, next_word);
     }
     return TRUE;
 }
 
+/*
+Function to encode a single operand instruction.
+Receives: const Instruction *inst - Instruction definition
+          char **operands - Array of operand strings
+          int operand_start - Index of first operand
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord *instruction_word - Pointer to instruction word
+Returns: int - TRUE if encoding succeeded, FALSE otherwise
+*/
 static int encode_one_operand(const Instruction *inst, char **operands, int operand_start, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     int src_mode;
-    MemoryWord operand_word, next_operand_word; 
+    MemoryWord operand_word, next_operand_word;
     operand_word.raw = 0;
     next_operand_word.raw = 0;
 
@@ -289,6 +387,17 @@ static int encode_one_operand(const Instruction *inst, char **operands, int oper
     return process_operand_storage(memory, current_ic_ptr, src_mode, operand_word, next_operand_word, 2);
 }
 
+/*
+Function to encode a 2 operand instruction, handles special case of two registers in one word.
+Receives: const Instruction *inst - Instruction definition
+          char **operands - Array of operand strings
+          int operand_start - Index of first operand
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord *instruction_word - Pointer to instruction word
+Returns: int - TRUE if encoding succeeded, FALSE otherwise
+*/
 static int encode_two_operands(const Instruction *inst, char **operands, int operand_start, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     int src_mode, dest_mode;
     MemoryWord src_operand_word, src_next_operand_word, dest_operand_word, dest_next_operand_word;
@@ -328,11 +437,19 @@ static int encode_two_operands(const Instruction *inst, char **operands, int ope
 
 /* Outer methods */
 /* ==================================================================== */
+/*
+Function to parse operands from tokenized line, determines operand start index and count.
+Receives: char **tokens - Array of tokens from line
+          int token_count - Total number of tokens
+          int *operand_start_index - Output for operand start index
+          int *operand_count - Output for number of operands
+Returns: int - Always TRUE (validation done elsewhere)
+*/
 int parse_operands(char **tokens, int token_count, int *operand_start_index, int *operand_count) {
     int i;
     *operand_start_index = 0;
 
-    if (has_label_in_tokens(tokens, token_count))
+    if (is_first_token_label(tokens, token_count))
         *operand_start_index = 2; /* Skip label and instruction name */
     else
         *operand_start_index = 1; /* Skip only instruction name */
@@ -345,6 +462,14 @@ int parse_operands(char **tokens, int token_count, int *operand_start_index, int
     return TRUE;
 }
 
+/*
+Function to validate operands against instruction requirements.
+Checks addressing modes and operand count.
+Receives: const Instruction *inst - Instruction definition
+          char **operands - Array of operand strings
+          int operand_count - Number of operands
+Returns: int - TRUE if operands are valid, FALSE otherwise
+*/
 int check_operands(const Instruction *inst, char **operands, int operand_count) {
     int i, addr_mode_flag, legal_modes;
 
@@ -373,6 +498,14 @@ int check_operands(const Instruction *inst, char **operands, int operand_count) 
     return TRUE;
 }
 
+/*
+Function to encode the instruction word (opcode and ARE bits), allocates space in memory image.
+Receives: const Instruction *inst - Instruction definition
+          MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord **current_word_ptr - Output for instruction word
+Returns: int - TRUE if encoding succeeded, FALSE on IC limit
+*/
 int encode_instruction_word(const Instruction *inst, MemoryImage *memory, int *current_ic_ptr, MemoryWord **current_word_ptr) {
     if (!check_ic_limit(*current_ic_ptr + 1))
         return FALSE;
@@ -387,11 +520,25 @@ int encode_instruction_word(const Instruction *inst, MemoryImage *memory, int *c
     return TRUE;
 }
 
+/*
+Function to route to appropriate encoder based on operand count.
+Receives: const Instruction *inst - Instruction definition
+          char **operands - Array of operand strings
+          int operand_start - Index of first operand
+          int operand_count - Number of operands
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryImage *memory - Pointer to memory image
+          int *current_ic_ptr - Pointer to current IC value
+          MemoryWord *instruction_word - Pointer to instruction word
+Returns: int - TRUE if encoding succeeded, FALSE otherwise
+*/
 int encode_operands(const Instruction *inst, char **operands, int operand_start, int operand_count, SymbolTable *symtab, MemoryImage *memory, int *current_ic_ptr, MemoryWord *instruction_word) {
     if (inst->num_operands == NO_OPERANDS) 
         return TRUE;
+
     if (inst->num_operands == ONE_OPERAND)
         return encode_one_operand(inst, operands, operand_start, symtab, memory, current_ic_ptr, instruction_word);
+
     else if (inst->num_operands == TWO_OPERANDS)
         return encode_two_operands(inst, operands, operand_start, symtab, memory, current_ic_ptr, instruction_word);
 

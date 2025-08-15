@@ -11,6 +11,17 @@
 
 /* Inner STATIC methods */
 /* ==================================================================== */
+/*
+Function to construct full filenames by combining base name with standard extensions.
+Generates filenames for: input (.as), preprocessed (.am), object (.ob), entry (.ent), and external (.ext) files
+Receives: const char* base_filename - Base filename without extension
+          char* input_file - Output buffer for input filename
+          char* am_file - Output buffer for preprocessed filename
+          char* obj_file - Output buffer for object filename
+          char* ent_file - Output buffer for entry filename
+          char* ext_file - Output buffer for externals filename
+Returns: void
+*/
 static void build_files(const char* base_filename, char* input_file, char* am_file, char* obj_file, char* ent_file, char* ext_file) {
     sprintf(input_file, "%s%s", base_filename, FILE_EXT_INPUT);
     sprintf(am_file, "%s%s", base_filename, FILE_EXT_PREPROC);
@@ -19,30 +30,19 @@ static void build_files(const char* base_filename, char* input_file, char* am_fi
     sprintf(ext_file, "%s%s", base_filename, FILE_EXT_EXTERN);
 }
 
-static int run_preprocessor(const char* input_file, const char* am_file, MacroTable *macrotab) {
-    if (!preprocess_macros(input_file, am_file, macrotab)) {
-        print_error("Preprocessing failed", input_file);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static int run_first_pass(const char* am_file, SymbolTable *symtab, MemoryImage *memory) {
-    if (first_pass(am_file, symtab, memory) == PASS_ERROR) {
-        print_error("First pass failed", am_file);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static int run_second_pass(const char* am_file, SymbolTable *symtab, MemoryImage *memory, const char* obj_file, const char* ent_file, const char* ext_file) {
-    if (second_pass(am_file, symtab, memory, obj_file, ent_file, ext_file) == PASS_ERROR) {
-        print_error("Second pass failed", am_file);
-        return FALSE;
-    }
-    return TRUE;
-}
-
+/*
+Function to process a single .as file through the complete assembler pipeline:
+- Preprocessing (macro expansion)
+- First pass (symbol table creation)
+- Second pass (code encoding & output)
+Receives: const char* base_filename - Base filename without extension
+          const int file_number - Current file index (for progress display)
+          const int total_files - Total files to process
+          SymbolTable *symtab - Pointer to symbol table
+          MemoryImage *memory - Pointer to memory image
+          MacroTable *macrotab - Pointer to macro table
+Returns: int - TRUE if file processed successfully, FALSE on any error
+*/
 static int process_input_file(const char* base_filename, const int file_number, const int total_files, SymbolTable *symtab, MemoryImage *memory, MacroTable *macrotab) {
     char input_file[MAX_FILENAME_LENGTH];
     char am_file[MAX_FILENAME_LENGTH];
@@ -60,13 +60,33 @@ static int process_input_file(const char* base_filename, const int file_number, 
     }
     safe_fclose(&test_file);
 
-    return (run_preprocessor(input_file, am_file, macrotab) &&
-            run_first_pass(am_file, symtab, memory) &&
-            run_second_pass(am_file, symtab, memory, obj_file, ent_file, ext_file));
+    if (preprocess_macros(input_file, am_file, macrotab) == PASS_ERROR) {
+        printf("%cPreprocessing failed for %s%c", NEWLINE, input_file, NEWLINE);
+        return FALSE;
+    }
+    if (first_pass(am_file, symtab, memory) == PASS_ERROR) {
+        printf("%cFirst pass failed for %s%c", NEWLINE, am_file, NEWLINE);
+        return FALSE;
+    }
+    if (second_pass(am_file, symtab, memory, obj_file, ent_file, ext_file) == PASS_ERROR) {
+        printf("%cSecond pass failed for %s%c", NEWLINE, am_file, NEWLINE);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 /* App main method */
 /* ==================================================================== */
+/*
+Main entry point to the assembler program.
+Processes multiple assembly files through complete pipeline.
+Manages initialization and cleanup of data structures.
+Displays summary upon completion.
+Receives: int argc - Number of command line arguments
+          char *argv[] - Array of command line arguments
+                         (argv[1..n] are input filenames)
+Returns: int - 0 if all files processed successfully, 1 otherwise
+*/
 int main(int argc, char *argv[]) {
     int i, runtime_result;
     int success_count = 0, total_files = argc - 1;
@@ -87,13 +107,11 @@ int main(int argc, char *argv[]) {
             print_error("Failed to initialize symbol table for file", argv[i]);
             continue;
         }
-
         if (!init_macro_table(&macrotab)) {
             print_error("Failed to initialize macro table for file", argv[i]);
             free_symbol_table(&symtab);
             continue;
         }
-
         if (process_input_file(argv[i], i, total_files, &symtab, &memory, &macrotab))
             success_count++;
 
