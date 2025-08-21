@@ -18,7 +18,7 @@ Returns: int - TRUE if line has only whitespace, FALSE otherwise
 static int is_empty_line(const char *line) {
     if (!line) 
         return TRUE;
-    
+
     while (*line) {
         if (!isspace(*line))
             return FALSE;
@@ -100,16 +100,20 @@ Receives: char *line - The definition line to process
 Returns: int - TRUE if definition processed successfully, FALSE otherwise
 */
 static int process_macro_definition(char *line, MacroTable *macrotab, Macro **current_macro, int line_num) {
-    char *name;
+    char temp_line[MAX_LINE_LENGTH];
+    char *name, *rest;
     size_t length;
 
-    if (strchr(line, LABEL_TERMINATOR)) {
-        print_line_error("Label not allowed before 'mcro' definition", NULL, line_num);
+    strcpy(temp_line, line);
+    length = strlen(MACRO_START);
+
+    name = strtok(temp_line + length, SPACE_TAB);
+    rest = strtok(NULL, SPACE_TAB);
+
+    if (rest != NULL) {
+        print_line_error("Extra content after macro definition", NULL, line_num);
         return FALSE;
     }
-    length = strlen(MACRO_START);
-    name = strtok(line + length, SPACE_TAB);
-
     if (!name) {
         print_line_error("Missing macro name", NULL, line_num);
         return FALSE;
@@ -135,10 +139,6 @@ Receives: const char *original_line - The unprocessed line
 static void process_macro_body(const char *original_line, Macro *current_macro, int line_num) {
     char clean_line[MAX_LINE_LENGTH];
 
-    if (strchr(original_line, LABEL_TERMINATOR)) {
-        print_line_error("Label not allowed inside a macro", NULL, line_num);
-        return;
-    }
     strcpy(clean_line, original_line);
     preprocess_line(clean_line);
 
@@ -196,7 +196,7 @@ static int process_macro_call_line(const char *line, FILE *am, const MacroTable 
     macro_name = extract_macro_name(line);
 
     if (!macro_name) {
-        print_line_error("Empty macro name after label", NULL, line_num);
+        print_line_error("Empty macro name after declaration", NULL, line_num);
         return FALSE;
     }
     macro = find_macro(macrotab, macro_name);

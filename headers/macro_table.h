@@ -1,6 +1,8 @@
 #ifndef MACRO_TABLE_H
 #define MACRO_TABLE_H
 
+#include "utils.h"
+
 #define INITIAL_MACROS_CAPACITY 8
 #define MAX_MACRO_NAME_LENGTH 31  /* 30 chars + null terminator */
 #define INITIAL_MACRO_BODY_CAPACITY 8
@@ -45,7 +47,9 @@ int is_macro_call(const char *line, const MacroTable *table);
      strcmp((label), MACRO_END) == 0)
 
 #define IS_MACRO_DEFINITION(line) \
-    (strncmp((line), MACRO_START, strlen(MACRO_START)) == 0)
+    (strncmp((line), MACRO_START " ", strlen(MACRO_START) + 1) == 0 || \
+     (strncmp((line), MACRO_START, strlen(MACRO_START)) == 0 && \
+      (line)[strlen(MACRO_START)] == NULL_TERMINATOR))
 
 #define IS_MACRO_END(line) \
     (strcmp((line), MACRO_END) == 0)
