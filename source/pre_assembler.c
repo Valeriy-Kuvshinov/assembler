@@ -222,13 +222,9 @@ Receives: const char *original_line - The unprocessed line
 Returns: int - TRUE if processing succeeded, FALSE on error
 */
 static int handle_in_macro_definition(const char *original_line, const char *processed_line, Macro *current_macro, int *in_macro_definition, int line_num) {
-    if (IS_MACRO_END(processed_line)) {
-        if (strchr(original_line, LABEL_TERMINATOR)) {
-            print_line_error("Label not allowed before 'mcroend'", NULL, line_num);
-            return FALSE;
-        }
+    if (IS_MACRO_END(processed_line))
         *in_macro_definition = FALSE;
-    } else
+    else
         process_macro_body(original_line, current_macro, line_num);
 
     return TRUE;
@@ -310,10 +306,6 @@ static int process_file_lines(FILE *src_fp, FILE *am_fp, MacroTable *macrotab) {
 
         if (!process_line(original_line, processed_line, am_fp, macrotab, &current_macro, &in_macro_definition, line_num))
             has_error = TRUE;
-    }
-    if (in_macro_definition) {
-        print_line_error("Macro not closed with 'mcroend'", NULL, line_num);
-        has_error = TRUE;
     }
     return (has_error ? FALSE : TRUE);
 }
