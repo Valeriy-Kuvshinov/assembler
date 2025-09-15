@@ -13,3 +13,7 @@ assembler
 *.ob
 *.ent
 *.ext
+
+# Input example files
+!good_tests/**/*.as
+!bad_tests/**/*.as
